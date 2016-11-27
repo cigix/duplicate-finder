@@ -10,14 +10,21 @@ from levenshtein import levenshtein
 LEVENSHTEIN_TOLERANCE = 3
 
 paths = list() # {'path': path, 'hash': md5 hash, 'name': basename}
+print('Looking for files...', end='')
+count = 0
 for path, _, files in os.walk('.'):
     for file in files:
-        with open(path + '/' + file, 'rb') as f:
-            content = f.read()
-        paths.append({'path': path + '/' + file,
-                      'hash': md5(content).digest(),
-                      'name': file})
+        paths.append({'path': path + '/' + file, 'name': file})
+        count += 1
+print(count, 'files found')
 
+for i, file in enumerate(paths):
+    print('\rComputing hashes...{}/{}'.format(i + 1, count), end='')
+    with open(file['path'], 'rb') as f:
+        content = f.read()
+    file['hash'] = md5(content).digest()
+
+print('\nComparing files...')
 for i, f1 in enumerate(paths):
     for f2 in paths[i+1:]:
         if f1['hash'] == f2['hash']:
