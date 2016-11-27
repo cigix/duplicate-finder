@@ -2,17 +2,15 @@
 '''Compute the difference between file names and find identical files in a
 folder hierarchy.'''
 
-import os
-
 from hashlib import md5
 from levenshtein import levenshtein
-
-LEVENSHTEIN_TOLERANCE = 3
+from math import sqrt
+from os import walk as explore
 
 paths = list() # {'path': path, 'hash': md5 hash, 'name': basename}
 print('Looking for files...', end='')
 count = 0
-for path, _, files in os.walk('.'):
+for path, _, files in explore('.'):
     for file in files:
         paths.append({'path': path + '/' + file, 'name': file})
         count += 1
@@ -29,5 +27,5 @@ for i, f1 in enumerate(paths):
     for f2 in paths[i+1:]:
         if f1['hash'] == f2['hash']:
             print(f1['path'], 'and', f2['path'], 'are identical')
-        if levenshtein(f1['name'], f2['name']) <= LEVENSHTEIN_TOLERANCE:
+        if levenshtein(f1['name'], f2['name']) <= sqrt(len(f1['name'])):
             print(f1['path'], 'and', f2['path'], 'have similar names')
