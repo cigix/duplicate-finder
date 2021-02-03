@@ -71,7 +71,7 @@ def compare_files(files):
                 ['compare', '-metric', 'ncc', file1[3], file2[3], '/dev/null'],
                 capture_output=True)
         score = float(compare.stderr.decode())
-        return (file1[0], file2[0], identical, similar, 0.9 <= score)
+        return (file1[0], file2[0], identical, similar, 0.9 <= score <= 1.1)
     return (file1[0], file2[0], identical, similar, False)
 
 print("\nComparing files...")
