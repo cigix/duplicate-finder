@@ -17,6 +17,9 @@ However, you could have a file encoded with the wrong (not restrictive enough)
 colorspace. `duplicate-finder` will also try to filter out the nonsensical
 results from the comparison.
 
+The `find-grayscale` program may help you find images that have a larger
+colorspace than needed.
+
 ## Dependencies
 
 * ImageMagick (install through your distribution)

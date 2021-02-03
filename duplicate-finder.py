@@ -20,9 +20,9 @@ from levenshtein import levenshtein
 # Step 1: list all files
 paths = list()
 print("Looking for files...")
-for path, _, files in os.walk('.'):
+for root, _, files in os.walk('.'):
     for file in files:
-        paths.append((path, file))
+        paths.append((root, file))
 print(f"{len(paths)} files found")
 
 # Step 2: for each file, extract the name, compute the md5, and create a
@@ -60,8 +60,8 @@ def compare_files(files):
     if file1[3] is not None and file2[3] is not None:
         if identical:
             return (file1[0], file2[0], identical, similar, True)
-        with Image.open(file1[0]) as i1:
-            with Image.open(file2[0]) as i2:
+        with Image.open(file1[3]) as i1:
+            with Image.open(file2[3]) as i2:
                 # ncc gives an unusable score when the bit depth of file 2 is
                 # less than file 1
                 # TODO: find a better compare command

@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+'''Find files that are grayscale but are encoded in a larger colorspace.'''
+
+import itertools
+import multiprocessing
+import os
+import subprocess
+import tempfile
+import os.path
+
+import tqdm
+
+from PIL import Image
+
+# Step 1: list all files
+paths = list()
+print("Looking for files...")
+for root, _, files in os.walk('.'):
+    for file in files:
+        _, extension = os.path.splitext(file)
+        if extension in ['.jpg', '.png']:
+            path = os.path.join(root, file)
+            with Image.open(path) as img:
+                if img.mode in ['1', 'L']:
+                    # Image is already monochrome or grayscale
+                    continue
+            paths.append(path)
+print(f"{len(paths)} images found")
+
+# Step 2: convert each file to grayscale and compare it to the original
+def process_file(path):
+    f, tmppath = tempfile.mkstemp()
+    os.close(f)
+    subprocess.run(
+            ['convert', '-colorspace', 'gray', path, tmppath])
+    compare = subprocess.run(
+            # -quiet because bad JPEG files print warnings on the same output as
+            # the comparison score
+            ['compare', '-metric', 'DSSIM', '-quiet', path, tmppath,
+                '/dev/null'],
+            capture_output=True)
+    score = float(compare.stderr.decode())
+    os.unlink(tmppath)
+    return (path, score)
+
+print("\nConverting files to grayscale...")
+with multiprocessing.Pool() as pool:
+    scores = list(
+            tqdm.tqdm(
+                pool.imap_unordered(process_file, paths),
+                total=len(paths)))
+
+# Step 3: present results
+print()
+for path, score in scores:
+    if score < 0.0015:
+        print(f"{path} looks grayscale but is encoded in color")
