@@ -50,7 +50,9 @@ with multiprocessing.Pool() as pool:
             tqdm.tqdm(
                 pool.imap_unordered(process_file, paths),
                 total=len(paths),
-                unit="file"))
+                unit="file",
+                dynamic_ncols=True,
+                smoothing=0))
 
 # Step 3: for each pair of files, compare their hashes, names, and resized
 # images where applicable
@@ -106,13 +108,13 @@ except KeyboardInterrupt:
 print()
 for identicals in hashes.values():
     if len(identicals) > 1:
-        print("identical:", *sorted(identicals))
+        print("identical:", *map(lambda s: f"'{s}'", sorted(identicals)))
 print()
 for path1, path2, similar_name, similar_img in comparisons:
     if similar_name:
-        print(f"similar name: {path1} {path2}")
+        print(f"similar name: '{path1}' '{path2}'")
     if similar_img:
-        print(f"similar images: {path1} {path2}")
+        print(f"similar images: '{path1}' '{path2}'")
 
 # Step 5: clean up
 for _, _, _, tmppath in files:
