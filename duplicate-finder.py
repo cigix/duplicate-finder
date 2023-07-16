@@ -8,6 +8,7 @@ import math
 import multiprocessing
 import os
 import subprocess
+import sys
 import tempfile
 import os.path
 
@@ -16,6 +17,8 @@ import tqdm
 from PIL import Image
 
 from levenshtein import levenshtein
+
+COMPARE_IMAGES = '--fast' not in sys.argv
 
 # Step 1: list all files
 paths = list()
@@ -36,7 +39,7 @@ def process_file(path):
     with open(filepath, 'rb') as f:
         h = hashlib.md5(f.read()).digest()
     name, extension = os.path.splitext(file)
-    if extension in ['.jpg', '.png']:
+    if COMPARE_IMAGES and extension in ['.jpg', '.png']:
         f, tmppath = tempfile.mkstemp(suffix=extension)
         os.close(f)
         subprocess.run(
