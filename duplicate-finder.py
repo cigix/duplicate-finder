@@ -4,13 +4,14 @@ folder hierarchy.'''
 
 import hashlib
 import itertools
+import json
 import math
 import multiprocessing
 import os
+import os.path
 import subprocess
 import sys
 import tempfile
-import os.path
 
 import tqdm
 
@@ -19,6 +20,7 @@ from PIL import Image
 from levenshtein import levenshtein
 
 COMPARE_IMAGES = '--fast' not in sys.argv
+CACHE_FILE = os.path.expanduser("~/.cache/duplicate-finder_cache.json")
 
 # Step 1: list all files
 paths = list()
@@ -28,6 +30,14 @@ for root, _, files in os.walk('.'):
         if not os.path.islink(os.path.join(root,file)):
             paths.append((root, file))
 print(f"{len(paths)} files found")
+
+try:
+    with open(CACHE_FILE) as f:
+        cache = json.load(f)
+    print(f"Loaded {len(cache)} cached entries")
+except Exception: # File not found, JSON parsing error, any fs error...
+    cache = dict()
+    print("Could not load cache")
 
 # Step 2: for each file, extract the name, compute the md5, and create a
 # resized, smaller copy if it is an image.
@@ -74,25 +84,35 @@ unique_files = {
     }
 print(f"{len(files)} -> {len(unique_files)}")
 
+def cache_key(file1, file2):
+    hash1, hash2 = sorted([file1[2], file2[2]])
+    return hash1.hex() + hash2.hex()
+
+def compute_similarity_score(file1, file2):
+    # ncc gives an unusable score when the bit depth of file2 is less than file1
+    # TODO: find a better compare command
+    with Image.open(file1[3]) as i1:
+        with Image.open(file2[3]) as i2:
+            if i1.mode != i2.mode:
+                return None
+    compare = subprocess.run(
+            ['compare', '-metric', 'ncc', file1[3], file2[3], '/dev/null'],
+            capture_output=True)
+    return float(compare.stderr.decode())
+
 def compare_files(files):
     file1, file2 = files
     # Similar name
     similar = levenshtein(file1[1], file2[2]) < math.log(len(file1[1]))
     # Similar images
     if file1[3] is not None and file2[3] is not None:
-        with Image.open(file1[3]) as i1:
-            with Image.open(file2[3]) as i2:
-                # ncc gives an unusable score when the bit depth of file 2 is
-                # less than file 1
-                # TODO: find a better compare command
-                if i1.mode != i2.mode:
-                    return (file1[0], file2[0], similar, False)
-        compare = subprocess.run(
-                ['compare', '-metric', 'ncc', file1[3], file2[3], '/dev/null'],
-                capture_output=True)
-        score = float(compare.stderr.decode())
-        return (file1[0], file2[0], similar, 0.9 <= score <= 1.1)
-    return (file1[0], file2[0], similar, False)
+        key = cache_key(file1, file2)
+        if key in cache:
+            score = cache[key]
+        else:
+            score = compute_similarity_score(file1, file2)
+        return (file1[0], file2[0], similar, score, key)
+    return (file1[0], file2[0], similar, None, None)
 
 print("Comparing unique files...")
 try:
@@ -118,11 +138,16 @@ for identicals in hashes.values():
     if len(identicals) > 1:
         print("identical:", *map(escape, sorted(identicals)))
 print()
-for path1, path2, similar_name, similar_img in comparisons:
+for path1, path2, similar_name, similar_img_score, key in comparisons:
     if similar_name:
         print(f"similar name: {escape(path1)} {escape(path2)}")
-    if similar_img:
-        print(f"similar images: {escape(path1)} {escape(path2)}")
+    if similar_img_score:
+        if 0.9 <= similar_img_score <= 1.1:
+            print(f"similar images: {escape(path1)} {escape(path2)}")
+        cache[key] = similar_img_score
+
+with open(CACHE_FILE, 'w') as f:
+    json.dump(cache, f)
 
 # Step 5: clean up
 for _, _, _, tmppath in files:
