@@ -107,17 +107,22 @@ try:
 except KeyboardInterrupt:
     comparisons = list()
 
+def escape(filename):
+    if ' ' in filename:
+        return "'" + filename + "'"
+    return filename
+
 # Step 4: present results
 print()
 for identicals in hashes.values():
     if len(identicals) > 1:
-        print("identical:", *map(lambda s: f"'{s}'", sorted(identicals)))
+        print("identical:", *map(escape, sorted(identicals)))
 print()
 for path1, path2, similar_name, similar_img in comparisons:
     if similar_name:
-        print(f"similar name: '{path1}' '{path2}'")
+        print(f"similar name: {escape(path1)} {escape(path2)}")
     if similar_img:
-        print(f"similar images: '{path1}' '{path2}'")
+        print(f"similar images: {escape(path1)} {escape(path2)}")
 
 # Step 5: clean up
 for _, _, _, tmppath in files:
