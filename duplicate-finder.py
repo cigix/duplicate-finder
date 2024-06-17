@@ -138,13 +138,32 @@ for identicals in hashes.values():
     if len(identicals) > 1:
         print("identical:", *map(escape, sorted(identicals)))
 print()
-for path1, path2, similar_name, similar_img_score, key in comparisons:
+for path1, path2, similar_name, _, _ in comparisons:
     if similar_name:
         print(f"similar name: {escape(path1)} {escape(path2)}")
+print()
+similars = dict() # path to set of similars. sets are shared among multiple keys
+for path1, path2, _, similar_img_score, key in comparisons:
     if similar_img_score:
-        if 0.9 <= similar_img_score <= 1.1:
-            print(f"similar images: {escape(path1)} {escape(path2)}")
         cache[key] = similar_img_score
+        if 0.9 <= similar_img_score <= 1.1:
+            if path1 in similars.keys() and path2 in similars.keys():
+                similar_to_path2 = similars[path2]
+                similars[path1].update(similar_to_path2)
+                for path in similar_to_path2:
+                    similars[path] = similars[path1]
+            elif path1 in similars.keys():
+                similars[path1].add(path2)
+                similars[path2] = similars[path1]
+            elif path2 in similars.keys():
+                similars[path2].add(path1)
+                similars[path1] = similars[path2]
+            else:
+                similars[path1] = {path1, path2}
+                similars[path2] = similars[path1]
+similarity_sets = {frozenset(s) for s in similars.values()}
+for similarity_set in similarity_sets:
+    print("similar images:", " ".join(escape(path) for path in similarity_set))
 
 with open(CACHE_FILE, 'w') as f:
     json.dump(cache, f)
