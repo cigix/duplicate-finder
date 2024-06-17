@@ -53,7 +53,7 @@ def process_file(path):
         f, tmppath = tempfile.mkstemp(suffix=extension)
         os.close(f)
         subprocess.run(
-                ['convert', '-resize', '100x100', filepath, tmppath])
+                ['magick', filepath, '-resize', '100x100', tmppath])
         return (filepath, name, h, tmppath)
     return (filepath, name, h, None)
 
