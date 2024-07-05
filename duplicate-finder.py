@@ -9,6 +9,7 @@ import math
 import multiprocessing
 import os
 import os.path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -127,20 +128,15 @@ try:
 except KeyboardInterrupt:
     comparisons = list()
 
-def escape(filename):
-    if ' ' in filename:
-        return "'" + filename + "'"
-    return filename
-
 # Step 4: present results
 print()
 for identicals in hashes.values():
     if len(identicals) > 1:
-        print("identical:", *map(escape, sorted(identicals)))
+        print("identical:", *map(shlex.quote, sorted(identicals)))
 print()
 for path1, path2, similar_name, _, _ in comparisons:
     if similar_name:
-        print(f"similar name: {escape(path1)} {escape(path2)}")
+        print(f"similar name: {shlex.quote(path1)} {shlex.quote(path2)}")
 print()
 similars = dict() # path to set of similars. sets are shared among multiple keys
 for path1, path2, _, similar_img_score, key in comparisons:
@@ -163,7 +159,7 @@ for path1, path2, _, similar_img_score, key in comparisons:
                 similars[path2] = similars[path1]
 similarity_sets = {frozenset(s) for s in similars.values()}
 for similarity_set in similarity_sets:
-    print("similar images:", " ".join(escape(path) for path in similarity_set))
+    print("similar images:", " ".join(map(shlex.quote, similarity_set)))
 
 with open(CACHE_FILE, 'w') as f:
     json.dump(cache, f)
