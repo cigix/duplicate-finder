@@ -116,17 +116,19 @@ def compare_files(files):
     return (file1[0], file2[0], similar, None, None)
 
 print("Comparing unique files...")
-try:
-    with multiprocessing.Pool() as pool:
-        comparisons = list(
-                tqdm.tqdm(
-                    pool.imap_unordered(
-                        compare_files,
-                        itertools.combinations(unique_files, 2)),
-                    total=int(len(unique_files)*(len(unique_files) - 1)/2),
-                    unit="files"))
-except KeyboardInterrupt:
-    comparisons = list()
+comparisons = list()
+with multiprocessing.Pool() as pool:
+    it = iter(tqdm.tqdm(
+        pool.imap_unordered(
+            compare_files,
+            itertools.combinations(unique_files, 2)),
+        total=int(len(unique_files)*(len(unique_files) - 1)/2),
+        unit="files"))
+    while True:
+        try:
+            comparisons.append(next(it))
+        except (StopIteration, KeyboardInterrupt):
+            break
 
 # Step 4: present results
 print()
