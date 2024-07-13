@@ -1,9 +1,8 @@
 # Duplicate Finder: Find similar files in a hierarchy
 
 Iterate through the files in a hierarchy and look for similitudes between them.
-Currently three tests are implemented:
+Currently two tests are implemented:
 * hash comparison: will find byte-for-byte identical files
-* name comparison: will find files that have similar names
 * image comparison: will find images that have similar contents
 
 ## Note on image comparison
@@ -22,6 +21,9 @@ colorspace than needed.
 
 ## Dependencies
 
+Run `pip install -r requirements.txt`.
+
+* ISearch
+* Pillow
+* tqdm
 * ImageMagick (install through your distribution)
-* Pillow (install with `pip`)
-* tqdm (install with `pip`)

@@ -32,7 +32,7 @@ def process_file(path):
     f, tmppath = tempfile.mkstemp()
     os.close(f)
     subprocess.run(
-            ['convert', '-colorspace', 'gray', path, tmppath])
+            ['magick', '-colorspace', 'gray', path, tmppath])
     compare = subprocess.run(
             # -quiet because bad JPEG files print warnings on the same output as
             # the comparison score
