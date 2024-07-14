@@ -36,6 +36,12 @@ class File:
     def __str__(self):
         return shlex.quote(self.path)
 
+    def __hash__(self):
+        return hash(self.path)
+
+    def __eq__(self, other):
+        return self.path == other.path
+
 def list_files(dirpath):
     filepaths = list()
     for root, _, files in os.walk(dirpath):
@@ -159,20 +165,20 @@ def main(argv):
     similars = dict() # File to set of File. sets are shared among multiple keys
     for file1, file2, ncc_score in tqdm.tqdm(results, dynamic_ncols=True):
         if 0.9 <= ncc_score:
-            if file1.path in similars.keys() and file2.path in similars.keys():
-                similar_to_file2 = similars[file2.path]
-                similars[file1.path].update(similar_to_file2)
+            if file1 in similars.keys() and file2 in similars.keys():
+                similar_to_file2 = similars[file2]
+                similars[file1].update(similar_to_file2)
                 for path in similar_to_file2:
-                    similars[path] = similars[file1.path]
-            elif file1.path in similars.keys():
-                similars[file1.path].add(file2.path)
-                similars[file2.path] = similars[file1.path]
-            elif file2.path in similars.keys():
-                similars[file2.path].add(file1.path)
-                similars[file1.path] = similars[file2.path]
+                    similars[path] = similars[file1]
+            elif file1 in similars.keys():
+                similars[file1].add(file2)
+                similars[file2] = similars[file1]
+            elif file2 in similars.keys():
+                similars[file2].add(file1)
+                similars[file1] = similars[file2]
             else:
-                similars[file1.path] = {file1.path, file2.path}
-                similars[file2.path] = similars[file1.path]
+                similars[file1] = {file1, file2}
+                similars[file2] = similars[file1]
     similarity_sets = {frozenset(s) for s in similars.values()}
 
     print()

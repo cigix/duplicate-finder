@@ -19,9 +19,13 @@ results from the comparison.
 The `find-grayscale` program may help you find images that have a larger
 colorspace than needed.
 
-## Dependencies
+## Use
 
-Run `pip install -r requirements.txt`.
+Use through the `duplicate-finder.sh` script, which will manage the virtualenv.
+Either add this directory to your `$PATH`, or symlink the script in a place that
+is already in it.
+
+## Dependencies
 
 * ISearch
 * Pillow
