@@ -5,6 +5,7 @@ folder hierarchy.'''
 
 import hashlib
 import itertools
+import json
 import multiprocessing
 import os
 import shlex
@@ -17,13 +18,14 @@ import tqdm
 from PIL import Image
 
 TMP_DIR="/tmp/duplicate-finder"
+CACHE_FILE=os.path.expanduser("~/.cache/duplicate-finder_cache.json")
 
 class File:
     """A file in the filesystem."""
     def __init__(self, filepath):
         self.path = os.path.normpath(filepath)
         with open(self.path, "rb") as f:
-            self.hash = hashlib.md5(f.read()).digest()
+            self.hash = hashlib.md5(f.read()).hexdigest()
         filename = os.path.basename(filepath)
         self.name, self.extension = os.path.splitext(filename)
         self.isimage = self.extension in (".jpg", ".png")
@@ -137,13 +139,37 @@ def make_pairs(similar_groups):
     return pairs
 
 def make_thumbnail_path(file):
-    return os.path.join(TMP_DIR, file.hash.hex() + file.extension)
+    return os.path.join(TMP_DIR, file.hash + file.extension)
 
 def make_thumbnails(file):
     subprocess.run(["magick",
                     file.path,
                     "-resize", "100x100",
                     make_thumbnail_path(file)])
+
+CACHE=dict()
+def load_cache():
+    global CACHE
+    try:
+        with open(CACHE_FILE) as f:
+            CACHE = json.load(f)
+        print(f"Loaded {len(CACHE)} cached entries")
+    except Exception: # File not found, JSON parsing error, any fs error...
+        CACHE=dict()
+        print("Could not load cache")
+
+def get_from_cache(key):
+    global CACHE
+    return CACHE.get(key)
+
+def set_in_cache(key, value):
+    global CACHE
+    CACHE[key] = value
+
+def store_cache():
+    global CACHE
+    with open(CACHE_FILE, 'w') as f:
+        json.dump(CACHE, f)
 
 def ncc_score(thumb1, thumb2):
     # ncc gives an unusable score when the bit depth of file2 is less than file1
@@ -157,8 +183,14 @@ def ncc_score(thumb1, thumb2):
             capture_output=True)
     return float(compare.stderr.decode())
 
+def ncc_cache_key(file1, file2):
+    hash1, hash2 = sorted((file1.hash, file2.hash))
+    return hash1 + hash2
+
 def ncc_compare(files):
     file1, file2 = files
+    if score := get_from_cache(ncc_cache_key(file1, file2)):
+        return (file1, file2, score)
     thumb1 = make_thumbnail_path(file1)
     thumb2 = make_thumbnail_path(file2)
     return (file1, file2, ncc_score(thumb1, thumb2))
@@ -168,6 +200,7 @@ def main(argv):
     filepaths = list_files(".")
     len_files = len(filepaths)
     print("found", len_files)
+    load_cache()
     print()
     print("Extracting info from files...")
     with multiprocessing.Pool() as pool:
@@ -210,15 +243,22 @@ def main(argv):
                        unit="thumbnails",
                        dynamic_ncols=True))
         print("  Comparing pairs...")
-        results = list(tqdm.tqdm(pool.imap_unordered(ncc_compare, pairs),
-                                 total=len(pairs),
-                                 unit="pairs",
-                                 dynamic_ncols=True))
+        it = iter(tqdm.tqdm(pool.imap_unordered(ncc_compare, pairs),
+                            total=len(pairs),
+                            unit="pairs",
+                            dynamic_ncols=True))
+        results = list()
+        while True:
+            try:
+                results.append(next(it))
+            except (StopIteration, KeyboardInterrupt):
+                break
 
     print("  Compiling results...")
     similars = dict() # File to set of File. sets are shared among multiple keys
     similars = Clusterer()
     for file1, file2, ncc_score in tqdm.tqdm(results, dynamic_ncols=True):
+        set_in_cache(ncc_cache_key(file1, file2), ncc_score)
         if 0.9 <= ncc_score:
             similars.add_pair(file1, file2)
     similarity_sets = similars.compile()
@@ -232,6 +272,7 @@ def main(argv):
         if 1 < len(similarity_set):
             print("similar:", *sorted(similarity_set))
 
+    store_cache()
     return 0
 
 if __name__ == "__main__":
