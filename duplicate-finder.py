@@ -42,6 +42,46 @@ class File:
     def __eq__(self, other):
         return self.path == other.path
 
+class Clusterer:
+    """A manager for SCCs."""
+    def __init__(self):
+        self.d = dict()
+
+    def add_pair(self, a, b):
+        if a in self.d.keys() and b in self.d.keys():
+            sa = self.d[a]
+            sb = self.d[b]
+            # sa and sb have no intersection
+            # add all of sb to sa
+            sa.update(sb)
+            # everyone in sb is now associated with sa
+            for i in sb:
+                self.d[i] = sa
+        elif a in self.d.keys():
+            sa = self.d[a]
+            # add b to sa
+            sa.add(b)
+            # b is now associated with sa
+            self.d[b] = sa
+        elif b in self.d.keys():
+            sb = self.d[b]
+            # add a to sb
+            sb.add(a)
+            # a is now associated with sb
+            self.d[a] = sb
+        else:
+            # new SCC
+            s = {a, b}
+            self.d[a] = s
+            self.d[b] = s
+
+    def add_singular(self, a):
+        self.d.setdefault(a, {a})
+
+    def compile(self):
+        """Get all the SCCs."""
+        return frozenset(frozenset(s) for s in self.d.values())
+
 def list_files(dirpath):
     filepaths = list()
     for root, _, files in os.walk(dirpath):
@@ -163,23 +203,11 @@ def main(argv):
 
     print("  Compiling results...")
     similars = dict() # File to set of File. sets are shared among multiple keys
+    similars = Clusterer()
     for file1, file2, ncc_score in tqdm.tqdm(results, dynamic_ncols=True):
         if 0.9 <= ncc_score:
-            if file1 in similars.keys() and file2 in similars.keys():
-                similar_to_file2 = similars[file2]
-                similars[file1].update(similar_to_file2)
-                for path in similar_to_file2:
-                    similars[path] = similars[file1]
-            elif file1 in similars.keys():
-                similars[file1].add(file2)
-                similars[file2] = similars[file1]
-            elif file2 in similars.keys():
-                similars[file2].add(file1)
-                similars[file1] = similars[file2]
-            else:
-                similars[file1] = {file1, file2}
-                similars[file2] = similars[file1]
-    similarity_sets = {frozenset(s) for s in similars.values()}
+            similars.add_pair(file1, file2)
+    similarity_sets = similars.compile()
 
     print()
     for identicals in hashes.values():
