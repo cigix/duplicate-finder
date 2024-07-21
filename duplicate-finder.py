@@ -104,14 +104,28 @@ def dedup_hashes(hashes):
         }
 
 def match_phashes(files):
-    phashes = dict()
+    raw_phashes = dict()
+    similar_phashes = Clusterer()
     for file in files:
-        phashes.setdefault(file.phash, set()).add(file)
-    return phashes
+        raw_phashes.setdefault(file.phash, set()).add(file)
+        similar_phashes.add_singular(file.phash)
+
+    for phash1, phash2 in itertools.combinations(raw_phashes.keys(), 2):
+        if (phash1 ^ phash2).bit_count() < 2:
+            similar_phashes.add_pair(phash1, phash2)
+
+    phashes = set()
+    for phash_group in similar_phashes.compile():
+        files_in_group = set()
+        for phash in phash_group:
+            files_in_group.update(raw_phashes[phash])
+        phashes.add(frozenset(files_in_group))
+
+    return frozenset(phashes)
 
 def group_similars(phashes):
     similar_groups = set()
-    for similars in phashes.values():
+    for similars in phashes:
         if 1 < len(similars):
             similar_groups.add(frozenset(similars))
     return similar_groups
