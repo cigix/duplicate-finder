@@ -150,7 +150,7 @@ def ncc_compare(files):
     return (file1, file2, ncc_score(thumb1, thumb2))
 
 def main(argv):
-    print("Looking for files... ", end="")
+    print("Looking for files... ", end="", flush=True)
     filepaths = list_files(".")
     len_files = len(filepaths)
     print("found", len_files)
@@ -163,7 +163,7 @@ def main(argv):
                                dynamic_ncols=True))
 
     print()
-    print("Matching identical files... ", end="")
+    print("Matching identical files... ", end="", flush=True)
     hashes = match_hashes(files)
     uniques = dedup_hashes(hashes)
     len_uniques = len(uniques)
@@ -176,12 +176,12 @@ def main(argv):
     images = frozenset(filter(lambda f: f.isimage, uniques))
     len_images = len(images)
     print(len_images, "images")
-    print("1st pass: perceptual hashing... ", end="")
+    print("1st pass: perceptual hashing... ", end="", flush=True)
     phashes = match_phashes(images)
     len_phashes = len(phashes)
     print(len_phashes, "perceptually dissimilar groups")
 
-    print("2nd pass: normalized cross correllation... ", end="")
+    print("2nd pass: normalized cross correllation... ", end="", flush=True)
     similar_groups = group_similars(phashes)
     pairs = make_pairs(similar_groups)
     print(len(pairs), "pairs to compare")
