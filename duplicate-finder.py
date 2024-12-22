@@ -20,12 +20,15 @@ from PIL import Image
 TMP_DIR="/tmp/duplicate-finder"
 CACHE_FILE=os.path.expanduser("~/.cache/duplicate-finder_cache.json")
 
+def compute_hash(path):
+    with open(path, "rb") as f:
+        return hashlib.md5(f.read()).hexdigest()
+
 class File:
     """A file in the filesystem."""
     def __init__(self, filepath):
         self.path = os.path.normpath(filepath)
-        with open(self.path, "rb") as f:
-            self.hash = hashlib.md5(f.read()).hexdigest()
+        self.hash = compute_hash(self.path)
         filename = os.path.basename(filepath)
         self.name, self.extension = os.path.splitext(filename)
         self.isimage = self.extension in (".jpg", ".png")
@@ -170,6 +173,7 @@ def store_cache():
     global CACHE
     with open(CACHE_FILE, 'w') as f:
         json.dump(CACHE, f)
+    print(f"Stored {len(CACHE)} cached entries")
 
 def ncc_score(thumb1, thumb2):
     # ncc gives an unusable score when the bit depth of file2 is less than file1
@@ -187,6 +191,9 @@ def ncc_cache_key(file1, file2):
     hash1, hash2 = sorted((file1.hash, file2.hash))
     return hash1 + hash2
 
+def ncc_cache_dekey(key):
+    return key[:32], key[32:]
+
 def ncc_compare(files):
     file1, file2 = files
     if score := get_from_cache(ncc_cache_key(file1, file2)):
@@ -195,7 +202,7 @@ def ncc_compare(files):
     thumb2 = make_thumbnail_path(file2)
     return (file1, file2, ncc_score(thumb1, thumb2))
 
-def main(argv):
+def duplicate_finder():
     print("Looking for files... ", end="", flush=True)
     filepaths = list_files(".")
     len_files = len(filepaths)
@@ -274,6 +281,56 @@ def main(argv):
 
     store_cache()
     return 0
+
+def clean():
+    print("Looking for files... ", end="", flush=True)
+    filepaths = list_files(".")
+    len_files = len(filepaths)
+    print("found", len_files)
+    load_cache()
+    print()
+    print("Extracting info from files...")
+    with multiprocessing.Pool() as pool:
+        hashes_in_folder = frozenset(tqdm.tqdm(pool.imap_unordered(compute_hash,
+                                                                   filepaths),
+                                               total=len(filepaths),
+                                               unit="file",
+                                               dynamic_ncols=True))
+
+    print()
+    cache_keys_by_hash = dict()
+    for key in CACHE.keys():
+        hash1, hash2 = ncc_cache_dekey(key)
+        cache_keys_by_hash.setdefault(hash1, set()).add(key)
+        cache_keys_by_hash.setdefault(hash2, set()).add(key)
+    hashes_in_cache = frozenset(cache_keys_by_hash.keys())
+    hashes_in_cache_not_in_folder = hashes_in_cache - hashes_in_folder
+    len_not_in_folder = len(hashes_in_cache_not_in_folder)
+    keys_to_remove = set()
+    for h in hashes_in_cache_not_in_folder:
+        keys_to_remove |= cache_keys_by_hash[h]
+    len_cache = len(CACHE)
+    len_toremove = len(keys_to_remove)
+    print(f"{len_not_in_folder} files referenced in cache but not in folder. All in all, {len_toremove} entries ({round(len_toremove / len_cache * 100)}%) could be removed from the cache.")
+
+    answer = input("Remove them? [y/N] ").lower()
+    if answer == "y":
+        for key in keys_to_remove:
+            del CACHE[key]
+        store_cache()
+    return 0
+
+def main(argv):
+    if {"-h", "-help", "--help"} & set(argv):
+        print("Usage:")
+        print("\tduplicate-finder")
+        print("\t\tFind and report duplicate and similar files in the current folder")
+        print("\tduplicate-finder --clean")
+        print("\t\tRemoves entries in the cache that do not reference a file of the current folder")
+        return 0
+    if "--clean" in argv:
+        return clean()
+    return duplicate_finder()
 
 if __name__ == "__main__":
     exit(main(sys.argv))
