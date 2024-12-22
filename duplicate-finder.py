@@ -145,10 +145,13 @@ def make_thumbnail_path(file):
     return os.path.join(TMP_DIR, file.hash + file.extension)
 
 def make_thumbnails(file):
+    thumbnail_path = make_thumbnail_path(file)
+    if os.path.exists(thumbnail_path):
+        return
     subprocess.run(["magick",
                     file.path,
                     "-resize", "100x100",
-                    make_thumbnail_path(file)])
+                    thumbnail_path])
 
 CACHE=dict()
 def load_cache():
@@ -243,22 +246,24 @@ def duplicate_finder():
     tothumb = set()
     for group in similar_groups:
         tothumb.update(group)
+    print("  Making thumbnails...")
     with multiprocessing.Pool() as pool:
-        print("  Making thumbnails...")
         list(tqdm.tqdm(pool.imap_unordered(make_thumbnails, tothumb),
                        total=len(tothumb),
                        unit="thumbnails",
                        dynamic_ncols=True))
-        print("  Comparing pairs...")
+    print("  Comparing pairs...")
+    with multiprocessing.Pool() as pool:
         it = iter(tqdm.tqdm(pool.imap_unordered(ncc_compare, pairs),
                             total=len(pairs),
                             unit="pairs",
-                            dynamic_ncols=True))
+                            dynamic_ncols=True,
+                            smoothing=0))
         results = list()
         while True:
             try:
                 results.append(next(it))
-            except (StopIteration, KeyboardInterrupt):
+            except:
                 break
 
     print("  Compiling results...")
