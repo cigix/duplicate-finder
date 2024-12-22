@@ -31,7 +31,7 @@ class File:
         self.hash = compute_hash(self.path)
         filename = os.path.basename(filepath)
         self.name, self.extension = os.path.splitext(filename)
-        self.isimage = self.extension in (".jpg", ".png")
+        self.isimage = self.extension in (".jpg", ".png", ".webp")
         if self.isimage:
             self.phash = isearch.phash(self.path)
 
