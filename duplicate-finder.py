@@ -172,11 +172,19 @@ def set_in_cache(key, value):
     global CACHE
     CACHE[key] = value
 
-def store_cache():
+def store_cache(start_cache_size=None):
     global CACHE
     with open(CACHE_FILE, 'w') as f:
         json.dump(CACHE, f)
-    print(f"Stored {len(CACHE)} cached entries")
+    end_cache_size = cache_size()
+    if start_cache_size is None:
+        print(f"Stored {end_cache_size} cached entries")
+    else:
+        diff = end_cache_size - start_cache_size
+        print(f"Stored {end_cache_size} cached entries ({diff:+})")
+
+def cache_size():
+    return len(CACHE)
 
 def ncc_score(thumb1, thumb2):
     # ncc gives an unusable score when the bit depth of file2 is less than file1
@@ -211,6 +219,7 @@ def duplicate_finder():
     len_files = len(filepaths)
     print("found", len_files)
     load_cache()
+    start_cache_size = cache_size()
     print()
     print("Extracting info from files...")
     with multiprocessing.Pool() as pool:
@@ -283,8 +292,8 @@ def duplicate_finder():
     for similarity_set in similarity_sets:
         if 1 < len(similarity_set):
             print("similar:", *sorted(similarity_set))
-
-    store_cache()
+    print()
+    store_cache(start_cache_size)
     return 0
 
 def clean():
@@ -293,6 +302,7 @@ def clean():
     len_files = len(filepaths)
     print("found", len_files)
     load_cache()
+    start_cache_size = cache_size()
     print()
     print("Extracting info from files...")
     with multiprocessing.Pool() as pool:
@@ -314,15 +324,14 @@ def clean():
     keys_to_remove = set()
     for h in hashes_in_cache_not_in_folder:
         keys_to_remove |= cache_keys_by_hash[h]
-    len_cache = len(CACHE)
     len_toremove = len(keys_to_remove)
-    print(f"{len_not_in_folder} files referenced in cache but not in folder. All in all, {len_toremove} entries ({round(len_toremove / len_cache * 100)}%) could be removed from the cache.")
+    print(f"{len_not_in_folder} files referenced in cache but not in folder. All in all, {len_toremove} entries ({round(len_toremove / start_cache_size * 100)}%) could be removed from the cache.")
 
     answer = input("Remove them? [y/N] ").lower()
     if answer == "y":
         for key in keys_to_remove:
             del CACHE[key]
-        store_cache()
+        store_cache(start_cache_size)
     return 0
 
 def main(argv):
