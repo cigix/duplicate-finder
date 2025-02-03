@@ -366,6 +366,88 @@ def clean():
         store_cache(start_cache_size)
     return 0
 
+def interactive():
+    try:
+        with open(REPORT_FILE) as f:
+            report = json.load(f)
+    except FileNotFoundError:
+        print("Could not find the report file; did you run duplicate-finder beforehand?")
+        return 1
+
+    identicals = report["identicals"]
+    similars = report["similars"]
+
+    todelete = list()
+    for identicalset in identicals:
+        todelete.extend(identicalset[1:])
+    if todelete:
+        print(f"{len(todelete)} have identical matches.")
+        answer = input("Delete them? [Y/n] ").lower()
+        if answer != "n":
+            for file in todelete:
+                os.remove(file)
+            identicals = list()
+        print()
+
+    samesize = set()
+    diffsize = set()
+    others = list()
+    for similarityset in similars:
+        if len(similarityset) != 2:
+            others.append(tuple(similarityset))
+            continue
+        f1, f2 = similarityset
+        i1 = Image.open(f1)
+        i2 = Image.open(f2)
+        if i1.size == i2.size:
+            s1 = os.path.getsize(f1)
+            s2 = os.path.getsize(f2)
+            if s1 < s2:
+                samesize.add((f1, f2))
+            else:
+                samesize.add((f2, f1))
+            continue
+        if i1.height < i2.height and i1.width < i2.width:
+            diffsize.add((f1, f2))
+            continue
+        if i2.height < i1.height and i2.width < i1.width:
+            diffsize.add((f2, f1))
+            continue
+        others.append(tuple(similarityset))
+
+    for f1, f2 in diffsize:
+        feh = subprocess.Popen(["feh", f1, f2], stdin=subprocess.DEVNULL)
+        print("These pictures are similar but of different size.")
+        answer = input("Delete the smaller one? [y/N] ").lower()
+        if answer == "y":
+            os.remove(f1)
+        else:
+            others.append((f1, f2))
+        feh.terminate()
+        feh.wait()
+        print()
+
+    for f1, f2 in samesize:
+        feh = subprocess.Popen(["feh", f1, f2], stdin=subprocess.DEVNULL)
+        print("These pictures are similar and have the same size.")
+        answer = input("Delete the heavier one? [y/N] ").lower()
+        if answer == "y":
+            os.remove(f2)
+        else:
+            others.append((f1, f2))
+        feh.terminate()
+        feh.wait()
+        print()
+
+    store_report(identicals, others)
+
+    if others:
+        print("These files still need attention:")
+        for similarityset in others:
+            print("-", *similarityset)
+
+    return 0
+
 def main(argv):
     if {"-h", "-help", "--help"} & set(argv):
         print("Usage:")
@@ -375,9 +457,13 @@ def main(argv):
         print("\t\tprocesses: # of processes to parallelize process, default", PROCESS_COUNT)
         print("\tduplicate-finder --clean")
         print("\t\tRemoves entries in the cache that do not reference a file of the current folder")
+        print("\tduplicate-finder -i")
+        print("\t\tReview the reported results interactively")
         return 0
     if "--clean" in argv:
         return clean()
+    if "-i" in argv:
+        return interactive()
     return duplicate_finder(argv[1:])
 
 if __name__ == "__main__":
