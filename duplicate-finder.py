@@ -222,7 +222,12 @@ def ncc_compare(files):
     thumb2 = make_thumbnail_path(file2)
     return (file1, file2, ncc_score(thumb1, thumb2))
 
-def duplicate_finder():
+def duplicate_finder(args):
+    if 2 <= len(args):
+        PHASH_DIFF_BITS = int(args[0])
+        PROCESS_COUNT = int(args[1])
+    elif 1 == len(args):
+        PHASH_DIFF_BITS = int(args[0])
     print("Looking for files... ", end="", flush=True)
     filepaths = list_files(".")
     len_files = len(filepaths)
@@ -364,14 +369,16 @@ def clean():
 def main(argv):
     if {"-h", "-help", "--help"} & set(argv):
         print("Usage:")
-        print("\tduplicate-finder")
+        print("\tduplicate-finder [diff [processes]]")
         print("\t\tFind and report duplicate and similar files in the current folder")
+        print("\t\tdiff: # of bits difference to have similar perceptual hash, default", PHASH_DIFF_BITS)
+        print("\t\tprocesses: # of processes to parallelize process, default", PROCESS_COUNT)
         print("\tduplicate-finder --clean")
         print("\t\tRemoves entries in the cache that do not reference a file of the current folder")
         return 0
     if "--clean" in argv:
         return clean()
-    return duplicate_finder()
+    return duplicate_finder(argv[1:])
 
 if __name__ == "__main__":
     exit(main(sys.argv))
