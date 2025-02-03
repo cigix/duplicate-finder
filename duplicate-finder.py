@@ -20,6 +20,9 @@ from PIL import Image
 TMP_DIR="/tmp/duplicate-finder"
 CACHE_FILE=os.path.expanduser("~/.cache/duplicate-finder_cache.json")
 
+PHASH_DIFF_BITS=2
+PROCESS_COUNT=4
+
 def compute_hash(path):
     with open(path, "rb") as f:
         return hashlib.md5(f.read()).hexdigest()
@@ -116,7 +119,7 @@ def match_phashes(files):
         similar_phashes.add_singular(file.phash)
 
     for phash1, phash2 in itertools.combinations(raw_phashes.keys(), 2):
-        if (phash1 ^ phash2).bit_count() < 2:
+        if (phash1 ^ phash2).bit_count() <= PHASH_DIFF_BITS:
             similar_phashes.add_pair(phash1, phash2)
 
     phashes = set()
@@ -245,7 +248,8 @@ def duplicate_finder():
     print("1st pass: perceptual hashing... ", end="", flush=True)
     phashes = match_phashes(images)
     len_phashes = len(phashes)
-    print(len_phashes, "perceptually dissimilar groups")
+    print(len_phashes, "perceptually dissimilar groups",
+          f"(<={PHASH_DIFF_BITS} bits difference)")
 
     print("2nd pass: normalized cross correllation... ", end="", flush=True)
     similar_groups = group_similars(phashes)
@@ -256,24 +260,36 @@ def duplicate_finder():
     for group in similar_groups:
         tothumb.update(group)
     print("  Making thumbnails...")
-    with multiprocessing.Pool() as pool:
+    with multiprocessing.Pool(4) as pool:
         list(tqdm.tqdm(pool.imap_unordered(make_thumbnails, tothumb),
                        total=len(tothumb),
                        unit="thumbnails",
                        dynamic_ncols=True))
-    print("  Comparing pairs...")
-    with multiprocessing.Pool() as pool:
-        it = iter(tqdm.tqdm(pool.imap_unordered(ncc_compare, pairs),
+    print(f"  Comparing pairs... ({PROCESS_COUNT} processes)")
+    results = list()
+    if PROCESS_COUNT <= 1:
+        it = iter(tqdm.tqdm(map(ncc_compare, pairs),
                             total=len(pairs),
                             unit="pairs",
                             dynamic_ncols=True,
                             smoothing=0))
-        results = list()
         while True:
             try:
                 results.append(next(it))
             except:
                 break
+    else:
+        with multiprocessing.Pool(PROCESS_COUNT) as pool:
+            it = iter(tqdm.tqdm(pool.imap_unordered(ncc_compare, pairs),
+                                total=len(pairs),
+                                unit="pairs",
+                                dynamic_ncols=True,
+                                smoothing=0))
+            while True:
+                try:
+                    results.append(next(it))
+                except:
+                    break
 
     print("  Compiling results...")
     similars = dict() # File to set of File. sets are shared among multiple keys
