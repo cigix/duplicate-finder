@@ -19,6 +19,7 @@ from PIL import Image
 
 TMP_DIR="/tmp/duplicate-finder"
 CACHE_FILE=os.path.expanduser("~/.cache/duplicate-finder_cache.json")
+REPORT_FILE=os.path.expanduser("~/.cache/duplicate-finder_report.json")
 
 PHASH_DIFF_BITS=2
 PROCESS_COUNT=4
@@ -186,6 +187,11 @@ def store_cache(start_cache_size=None):
         diff = end_cache_size - start_cache_size
         print(f"Stored {end_cache_size} cached entries ({diff:+})")
 
+def store_report(identicals, similars):
+    with open(REPORT_FILE, 'w') as f:
+        json.dump({"identicals": identicals, "similars": similars}, f)
+    print(f"Report written at {REPORT_FILE}")
+
 def cache_size():
     return len(CACHE)
 
@@ -292,24 +298,29 @@ def duplicate_finder():
                     break
 
     print("  Compiling results...")
-    similars = dict() # File to set of File. sets are shared among multiple keys
+    identicals = list()
+    for identityset in hashes.values():
+        if 1 < len(identityset):
+            identicals.append(tuple(map(str, sorted(identicals))))
     similars = Clusterer()
     for file1, file2, ncc_score in tqdm.tqdm(results, dynamic_ncols=True):
         set_in_cache(ncc_cache_key(file1, file2), ncc_score)
         if 0.9 <= ncc_score:
             similars.add_pair(file1, file2)
-    similarity_sets = similars.compile()
+    similaritysets = list()
+    for similarityset in similars.compile():
+        if 1 < len(similarityset):
+            similaritysets.append(tuple(map(str, sorted(similarityset))))
 
     print()
-    for identicals in hashes.values():
-        if 1 < len(identicals):
-            print("identical:", *sorted(identicals))
-    print()
-    for similarity_set in similarity_sets:
-        if 1 < len(similarity_set):
-            print("similar:", *sorted(similarity_set))
-    print()
     store_cache(start_cache_size)
+    store_report(identicals, similaritysets)
+    print()
+    for identityset in identicals:
+        print("identical:", *identityset)
+    print()
+    for similarityset in similaritysets:
+        print("similar:", *sorted(similarityset))
     return 0
 
 def clean():
