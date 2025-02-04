@@ -306,7 +306,7 @@ def duplicate_finder(args):
     identicals = list()
     for identityset in hashes.values():
         if 1 < len(identityset):
-            identicals.append(tuple(map(str, sorted(identicals))))
+            identicals.append(tuple(map(str, sorted(identityset))))
     similars = Clusterer()
     for file1, file2, ncc_score in tqdm.tqdm(results, dynamic_ncols=True):
         set_in_cache(ncc_cache_key(file1, file2), ncc_score)
