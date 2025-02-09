@@ -386,7 +386,10 @@ def interactive():
         answer = input("Delete them? [Y/n] ").lower()
         if answer != "n":
             for file in todelete:
-                os.remove(file)
+                try:
+                    os.remove(shlex.split(file)[0])
+                except FileNotFoundError as e:
+                    print(f"{e.strerror}: {e.filename}")
             identicals = list()
         print()
 
@@ -421,7 +424,7 @@ def interactive():
         print("These pictures are similar but of different size.")
         answer = input("Delete the smaller one? [y/N] ").lower()
         if answer == "y":
-            os.remove(f1)
+            os.remove(shlex.split(f1)[0])
         else:
             others.append((f1, f2))
         feh.terminate()
@@ -433,7 +436,7 @@ def interactive():
         print("These pictures are similar and have the same size.")
         answer = input("Delete the heavier one? [y/N] ").lower()
         if answer == "y":
-            os.remove(f2)
+            os.remove(shlex.split(f2)[0])
         else:
             others.append((f1, f2))
         feh.terminate()
