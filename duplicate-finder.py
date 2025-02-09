@@ -223,6 +223,7 @@ def ncc_compare(files):
     return (file1, file2, ncc_score(thumb1, thumb2))
 
 def duplicate_finder(args):
+    global PHASH_DIFF_BITS, PROCESS_COUNT
     if 2 <= len(args):
         PHASH_DIFF_BITS = int(args[0])
         PROCESS_COUNT = int(args[1])
