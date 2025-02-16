@@ -9,6 +9,7 @@ import json
 import multiprocessing
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,8 @@ import tqdm
 from PIL import Image
 
 TMP_DIR="/tmp/duplicate-finder"
+THUMBNAILS_DIR=os.path.join(TMP_DIR, "thumbnails")
+TRASH_DIR=os.path.join(TMP_DIR, "trash")
 CACHE_FILE=os.path.expanduser("~/.cache/duplicate-finder_cache.json")
 REPORT_FILE=os.path.expanduser("~/.cache/duplicate-finder_report.json")
 
@@ -146,7 +149,7 @@ def make_pairs(similar_groups):
     return pairs
 
 def make_thumbnail_path(file):
-    return os.path.join(TMP_DIR, file.hash + file.extension)
+    return os.path.join(THUMBNAILS_DIR, file.hash + file.extension)
 
 def make_thumbnails(file):
     thumbnail_path = make_thumbnail_path(file)
@@ -267,7 +270,7 @@ def duplicate_finder(args):
     similar_groups = group_similars(phashes)
     pairs = make_pairs(similar_groups)
     print(len(pairs), "pairs to compare")
-    os.makedirs(TMP_DIR, exist_ok=True)
+    os.makedirs(THUMBNAILS_DIR, exist_ok=True)
     tothumb = set()
     for group in similar_groups:
         tothumb.update(group)
@@ -367,6 +370,12 @@ def clean():
         store_cache(start_cache_size)
     return 0
 
+def removefile(file):
+    try:
+        shutil.move(shlex.split(file)[0], TRASH_DIR)
+    except shutil.Error as e:
+        print(e.args[0])
+
 def interactive():
     try:
         with open(REPORT_FILE) as f:
@@ -378,6 +387,14 @@ def interactive():
     identicals = report["identicals"]
     similars = report["similars"]
 
+    if os.path.isdir(TRASH_DIR):
+        if os.listdir(TRASH_DIR):
+            print("Trash is not empty.")
+            answer = input("Empty it? [Y/n] ").lower()
+            if answer == "" or answer == "y":
+                shutil.rmtree(TRASH_DIR)
+    os.makedirs(TRASH_DIR, exist_ok=True)
+
     todelete = list()
     for identicalset in identicals:
         todelete.extend(identicalset[1:])
@@ -385,9 +402,11 @@ def interactive():
         print(f"{len(todelete)} have identical matches.")
         answer = input("Delete them? [Y/n] ").lower()
         if answer == "" or answer == "y":
+            if 1000 < len(todelete):
+                todelete = iter(tqdm.tqdm(todelete))
             for file in todelete:
                 try:
-                    os.remove(shlex.split(file)[0])
+                    removefile(file)
                 except FileNotFoundError as e:
                     print(f"{e.strerror}: {e.filename}")
             identicals = list()
@@ -424,7 +443,7 @@ def interactive():
         print("These pictures are similar but of different size.")
         answer = input("Delete the smaller one? [Y/n] ").lower()
         if answer == "" or answer == "y":
-            os.remove(shlex.split(f1)[0])
+            removefile(f1)
         else:
             print("Ok, keeping it for later")
             others.append((f1, f2))
@@ -439,7 +458,7 @@ def interactive():
         print("These pictures are similar and have the same size.")
         answer = input("Delete the heavier one? [Y/n] ").lower()
         if answer == "" or answer == "y":
-            os.remove(shlex.split(f2)[0])
+            removefile(f2)
         else:
             print("Ok, keeping it for later")
             others.append((f1, f2))
