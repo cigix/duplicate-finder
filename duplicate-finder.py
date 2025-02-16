@@ -280,9 +280,9 @@ def duplicate_finder(args):
                        total=len(tothumb),
                        unit="thumbnails",
                        dynamic_ncols=True))
-    print(f"  Comparing pairs... ({PROCESS_COUNT} processes)")
     results = list()
     if PROCESS_COUNT <= 1:
+        print(f"  Comparing pairs... (1 process)")
         it = iter(tqdm.tqdm(map(ncc_compare, pairs),
                             total=len(pairs),
                             unit="pairs",
@@ -294,6 +294,7 @@ def duplicate_finder(args):
             except:
                 break
     else:
+        print(f"  Comparing pairs... ({PROCESS_COUNT} processes)")
         with multiprocessing.Pool(PROCESS_COUNT) as pool:
             it = iter(tqdm.tqdm(pool.imap_unordered(ncc_compare, pairs),
                                 total=len(pairs),
