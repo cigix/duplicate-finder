@@ -384,7 +384,7 @@ def interactive():
     if todelete:
         print(f"{len(todelete)} have identical matches.")
         answer = input("Delete them? [Y/n] ").lower()
-        if answer != "n":
+        if answer == "" or answer == "y":
             for file in todelete:
                 try:
                     os.remove(shlex.split(file)[0])
@@ -422,22 +422,26 @@ def interactive():
     for f1, f2 in diffsize:
         feh = subprocess.Popen(["feh", f1, f2], stdin=subprocess.DEVNULL)
         print("These pictures are similar but of different size.")
-        answer = input("Delete the smaller one? [y/N] ").lower()
-        if answer == "y":
+        answer = input("Delete the smaller one? [Y/n] ").lower()
+        if answer == "" or answer == "y":
             os.remove(shlex.split(f1)[0])
         else:
+            print("Ok, keeping it for later")
             others.append((f1, f2))
         feh.terminate()
         feh.wait()
         print()
 
+    print("====================\n")
+
     for f1, f2 in samesize:
         feh = subprocess.Popen(["feh", f1, f2], stdin=subprocess.DEVNULL)
         print("These pictures are similar and have the same size.")
-        answer = input("Delete the heavier one? [y/N] ").lower()
-        if answer == "y":
+        answer = input("Delete the heavier one? [Y/n] ").lower()
+        if answer == "" or answer == "y":
             os.remove(shlex.split(f2)[0])
         else:
+            print("Ok, keeping it for later")
             others.append((f1, f2))
         feh.terminate()
         feh.wait()
