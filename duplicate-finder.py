@@ -443,7 +443,8 @@ def interactive():
             continue
         others.append(tuple(similarityset))
 
-    for f1, f2 in diffsize:
+    for i, (f1, f2) in enumerate(diffsize):
+        print(f"{i+1}/{len(diffsize)}: {f1} vs {f2}")
         feh = subprocess.Popen(["feh", f1, f2], stdin=subprocess.DEVNULL)
         print("These pictures are similar but of different size.")
         answer = input("Delete the smaller one? [Y/n] ").lower()
@@ -458,7 +459,8 @@ def interactive():
 
     print("====================\n")
 
-    for f1, f2 in samesize:
+    for i, (f1, f2) in enumerate(samesize):
+        print(f"{i+1}/{len(samesize)}: {f1} vs {f2}")
         feh = subprocess.Popen(["feh", f1, f2], stdin=subprocess.DEVNULL)
         print("These pictures are similar and have the same size.")
         answer = input("Delete the heavier one? [Y/n] ").lower()
