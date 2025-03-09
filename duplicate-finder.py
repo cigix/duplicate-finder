@@ -211,7 +211,7 @@ def ncc_score(thumb1, thumb2):
     compare = subprocess.run(
             ["compare", "-metric", "ncc", thumb1, thumb2, "/dev/null"],
             capture_output=True)
-    return float(compare.stderr.decode())
+    return float(compare.stderr.decode().split()[1][1:-1])
 
 def ncc_cache_key(file1, file2):
     hash1, hash2 = sorted((file1.hash, file2.hash))
@@ -307,7 +307,8 @@ def duplicate_finder(args):
             while True:
                 try:
                     results.append(next(it))
-                except:
+                except Exception as e:
+                    print(e)
                     break
 
     print("  Compiling results...")
@@ -318,7 +319,7 @@ def duplicate_finder(args):
     similars = Clusterer()
     for file1, file2, ncc_score in tqdm.tqdm(results, dynamic_ncols=True):
         set_in_cache(ncc_cache_key(file1, file2), ncc_score)
-        if 0.9 <= ncc_score:
+        if 0 <= ncc_score <= 0.1:
             similars.add_pair(file1, file2)
     similaritysets = list()
     for similarityset in similars.compile():
