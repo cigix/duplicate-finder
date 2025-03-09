@@ -6,6 +6,7 @@ folder hierarchy.'''
 import hashlib
 import itertools
 import json
+import math
 import multiprocessing
 import os
 import shlex
@@ -122,7 +123,9 @@ def match_phashes(files):
         raw_phashes.setdefault(file.phash, set()).add(file)
         similar_phashes.add_singular(file.phash)
 
-    for phash1, phash2 in itertools.combinations(raw_phashes.keys(), 2):
+    for phash1, phash2 in tqdm.tqdm(
+            itertools.combinations(raw_phashes.keys(), 2),
+            total=math.comb(len(raw_phashes), 2)):
         if (phash1 ^ phash2).bit_count() <= PHASH_DIFF_BITS:
             similar_phashes.add_pair(phash1, phash2)
 
@@ -260,7 +263,7 @@ def duplicate_finder(args):
     images = frozenset(filter(lambda f: f.isimage, uniques))
     len_images = len(images)
     print(len_images, "images")
-    print("1st pass: perceptual hashing... ", end="", flush=True)
+    print("1st pass: perceptual hashing...")
     phashes = match_phashes(images)
     len_phashes = len(phashes)
     print(len_phashes, "perceptually dissimilar groups",
