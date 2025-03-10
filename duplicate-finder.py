@@ -307,7 +307,7 @@ def duplicate_finder(args):
             while True:
                 try:
                     results.append(next(it))
-                except Exception as e:
+                except BaseException as e:
                     print(e)
                     break
 
