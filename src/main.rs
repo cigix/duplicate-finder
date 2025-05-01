@@ -1,3 +1,6 @@
+pub mod diff;
+pub mod files;
+
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
@@ -21,9 +24,9 @@ enum Mode {
 #[derive(Args)]
 struct DiffArgs {
     /// Number of bits difference to have similar perceptual hash
-    diff: Option<usize>,
-    /// Number of processes to parallelize process
-    processes: Option<usize>
+    bits: Option<usize>,
+    /// Number of parallel executions
+    parallel: Option<usize>
 }
 
 #[derive(Parser)]
@@ -40,7 +43,8 @@ fn main()
         // Result<CLI, Error>
         .or_else(|err| {
             match err.kind() {
-                clap::error::ErrorKind::InvalidSubcommand => {
+                clap::error::ErrorKind::InvalidSubcommand
+                | clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => {
                     CLIDefault::try_parse()
                         // Result<CLIDefault, Error>
                         .map_or_else(
@@ -59,7 +63,7 @@ fn main()
             err.exit();
         }); // CLI
     match cli.mode {
-        Mode::Diff(_args) => todo!(),
+        Mode::Diff(args) => diff::diff(args.bits, args.parallel),
         Mode::Clean => todo!(),
         Mode::Interactive => todo!()
     }
