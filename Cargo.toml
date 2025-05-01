@@ -1,0 +1,8 @@
+[package]
+name = "duplicate-finder"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.37", features = ["derive"] }
+image_hasher = "3.0.0"
