@@ -1,4 +1,9 @@
+use crate::cache;
 use crate::files;
+
+use std::io;
+use std::io::Write;
+use std::collections::HashMap;
 
 /// The default value for [diff]'s `bits` argument.
 pub const DEFAULT_BITS: usize = 0;
@@ -16,6 +21,22 @@ pub fn diff(bits: Option<usize>, parallel: Option<usize>) -> ()
 {
     let bits = bits.unwrap_or(DEFAULT_BITS);
     let parallel = parallel.unwrap_or(DEFAULT_PARALLEL);
+
+    print!("Looking for files... ");
+    io::stdout().flush().unwrap();
     let paths = files::list_files();
-    println!("{:?}", paths);
+    println!("found {}", paths.len());
+
+    print!("Loading cache... ");
+    io::stdout().flush().unwrap();
+    let cache = match cache::load_cache() {
+        Ok(cache) => {
+            println!("{} entries loaded", cache.len());
+            cache
+        }
+        Err(e) => {
+            println!("Could not load cache: {}", e);
+            HashMap::new()
+        }
+    };
 }
