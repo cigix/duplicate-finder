@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod clusterer;
 pub mod diff;
 pub mod files;
 
