@@ -5,6 +5,9 @@ use std::io;
 use std::io::Write;
 use std::collections::HashMap;
 
+use rayon::prelude::*;
+use simple_tqdm::ParTqdm;
+
 /// The default value for [diff]'s `bits` argument.
 pub const DEFAULT_BITS: usize = 0;
 /// The default value for [diff]'s `parallel` argument.
@@ -36,7 +39,24 @@ pub fn diff(bits: Option<usize>, parallel: Option<usize>) -> ()
         }
         Err(e) => {
             println!("Could not load cache: {}", e);
+            println!("Continuing with empty cache");
             HashMap::new()
+        }
+    };
+
+    let config = simple_tqdm::Config::new()
+        .with_desc("Processing files")
+        .with_unit("files");
+    let files_result: Result<Vec<files::File>, String> =
+        paths.into_par_iter()
+        .tqdm_config(config)
+        .map(files::File::from)
+        .collect();
+    let files = match files_result {
+        Ok(files) => files,
+        Err(e) => {
+            println!("Could not parse files: {}", e);
+            return;
         }
     };
 }

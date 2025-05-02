@@ -7,5 +7,8 @@ edition = "2024"
 clap = { version = "4.5.37", features = ["derive"] }
 dirs = "6.0.0"
 image_hasher = "3.0.0"
+md-5 = "0.10.6"
+rayon = "1.10.0"
 serde_json = "1.0.140"
+simple-tqdm = {version = "*", features = ["rayon"]}
 walkdir = "2.5.0"
