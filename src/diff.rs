@@ -3,7 +3,7 @@ use crate::files;
 
 use std::io;
 use std::io::Write;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rayon::prelude::*;
 use simple_tqdm::ParTqdm;
@@ -38,8 +38,8 @@ pub fn diff(bits: Option<usize>, parallel: Option<usize>) -> ()
             cache
         }
         Err(e) => {
-            println!("Could not load cache: {}", e);
-            println!("Continuing with empty cache");
+            println!("Could not load cache: {}, continuing with empty cache",
+                e);
             HashMap::new()
         }
     };
@@ -59,4 +59,49 @@ pub fn diff(bits: Option<usize>, parallel: Option<usize>) -> ()
             return;
         }
     };
+
+    print!("Comparing hashes... ");
+    io::stdout().flush().unwrap();
+    let mut hashes: HashMap::<[u8;16], HashSet<&files::File>> = HashMap::new();
+    for file in files.iter() {
+        let hash = file.hash().clone();
+        if let Some(set) = hashes.get_mut(&hash) {
+            set.insert(file);
+        } else {
+            let mut set = HashSet::new();
+            set.insert(file);
+            hashes.insert(hash, set);
+        }
+    }
+    let hashes = hashes; // Remove mut
+    if hashes.len() == files.len() {
+        println!("all uniques");
+    } else {
+        println!("{} unique files ({})",
+            hashes.len(), hashes.len() as isize - files.len() as isize);
+    }
+
+    println!("Compiling results...");
+    let mut identicals: HashSet<Vec<&files::File>>= HashSet::new();
+    for identityset in hashes.values() {
+        if 1 < identityset.len() {
+            let mut identical_files: Vec<&files::File> =
+                identityset.iter()
+                // Iter<&files::File>
+                .cloned()
+                .collect();
+            identical_files.sort();
+            identicals.insert(identical_files);
+        }
+    }
+    let identicals = identicals; // Remove mut
+
+    println!();
+    for identityset in identicals {
+        print!("identical:");
+        for file in identityset {
+            print!(" {}", file.name());
+        }
+        println!()
+    }
 }

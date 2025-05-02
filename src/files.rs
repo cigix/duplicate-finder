@@ -1,4 +1,6 @@
+use std::cmp::Ordering;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::PathBuf;
 
@@ -43,5 +45,45 @@ impl File {
             md5: hasher.finalize().into(),
             ihash: None
         })
+    }
+
+    pub fn hash(&self) -> &[u8;16]
+    {
+        &self.md5
+    }
+    pub fn name(&self) -> String
+    {
+        self.path
+            // PathBuf
+            .strip_prefix(".").unwrap()
+            // &Path
+            .to_str().unwrap()
+            // &str
+            .to_string()
+    }
+}
+
+impl PartialEq for File {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
+    }
+}
+impl Eq for File {}
+impl Ord for File {
+    fn cmp(&self, other: &Self) -> Ordering
+    {
+        self.path.cmp(&other.path)
+    }
+}
+impl PartialOrd for File {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering>
+    {
+        Some(self.cmp(other))
+    }
+}
+impl Hash for File {
+    fn hash<H: Hasher>(&self, state: &mut H)
+    {
+        self.path.hash(state);
     }
 }
