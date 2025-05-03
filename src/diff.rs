@@ -168,7 +168,8 @@ pub fn diff(bits: Option<usize>/*, parallel: Option<usize>*/) -> ()
         })
         // Iter<Vec<&files::File>>
         .collect();
-    if let Err(e) = report::store_report(&identicals, &similars) {
+    let report = report::Report::from(&identicals, &similars);
+    if let Err(e) = report::store_report(&report) {
         println!("Could not store report: {}", e);
     } else {
         println!("Report written");

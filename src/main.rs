@@ -1,6 +1,7 @@
 pub mod clusterer;
 pub mod diff;
 pub mod files;
+pub mod interactive;
 pub mod report;
 
 use clap::{Args, Parser, Subcommand};
@@ -67,6 +68,6 @@ fn main()
     match cli.mode {
         Mode::Diff(args) => diff::diff(args.bits/*, args.parallel*/),
         Mode::Clean => todo!(),
-        Mode::Interactive => todo!()
+        Mode::Interactive => interactive::interactive()
     }
 }
