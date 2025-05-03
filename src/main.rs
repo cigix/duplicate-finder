@@ -17,9 +17,9 @@ struct CLI {
 enum Mode {
     /// Find and report duplicate and similar files in the current folder
     Diff(DiffArgs),
-    /// Removes entries in the cache that do not reference a file of the current
-    /// folder
-    Clean,
+    ///// Removes entries in the cache that do not reference a file of the current
+    ///// folder
+    //Clean,
     /// Review the reported results interactively
     Interactive
 }
@@ -67,7 +67,7 @@ fn main()
         }); // CLI
     match cli.mode {
         Mode::Diff(args) => diff::diff(args.bits/*, args.parallel*/),
-        Mode::Clean => todo!(),
+        //Mode::Clean => todo!(),
         Mode::Interactive => interactive::interactive()
     }
 }
