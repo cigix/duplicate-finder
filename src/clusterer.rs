@@ -72,6 +72,10 @@ impl<T: Clone + Eq + Hash> Clusterer<T> {
                 self.entries.insert(a.clone(), b_index);
             }
             (Some(a_index), Some(b_index)) => {
+                if a_index == b_index {
+                    // a and b are already in the same SCC, do nothing
+                    return;
+                }
                 // 1. Add all members of b's SCC to a's
                 // 2. Register all members of b's SCC to a's
                 // 3. Delete b's SCC

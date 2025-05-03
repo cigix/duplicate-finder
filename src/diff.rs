@@ -109,13 +109,13 @@ pub fn diff(bits: Option<usize>/*, parallel: Option<usize>*/) -> ()
         .collect();
     println!("{} unique images", images.len());
 
+    println!("Comparing image hashes (<={} bits difference)", bits);
     let ihashes = make_file_sets(&images, |f| f.ihash.clone().unwrap());
     let mut clusterer: Clusterer<ImageHash> = Clusterer::new();
     for ihash in ihashes.keys() {
         clusterer.add_single(ihash);
     }
     let config = simple_tqdm::Config::new()
-        .with_desc("Comparing image hashes")
         .with_unit("ihash");
     for ihashvector in ihashes.keys()
         .combinations(2)
