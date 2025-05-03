@@ -27,8 +27,8 @@ enum Mode {
 struct DiffArgs {
     /// Number of bits difference to have similar perceptual hash
     bits: Option<usize>,
-    /// Number of parallel executions
-    parallel: Option<usize>
+    ///// Number of parallel executions
+    //parallel: Option<usize>
 }
 
 #[derive(Parser)]
@@ -65,7 +65,7 @@ fn main()
             err.exit();
         }); // CLI
     match cli.mode {
-        Mode::Diff(args) => diff::diff(args.bits, args.parallel),
+        Mode::Diff(args) => diff::diff(args.bits/*, args.parallel*/),
         Mode::Clean => todo!(),
         Mode::Interactive => todo!()
     }

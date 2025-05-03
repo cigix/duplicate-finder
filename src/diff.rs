@@ -1,6 +1,6 @@
-use crate::cache;
-use crate::files;
+//use crate::cache;
 use crate::clusterer::Clusterer;
+use crate::files;
 
 use std::hash::Hash;
 use std::io;
@@ -14,8 +14,8 @@ use simple_tqdm::{Tqdm, ParTqdm};
 
 /// The default value for [diff]'s `bits` argument.
 pub const DEFAULT_BITS: usize = 0;
-/// The default value for [diff]'s `parallel` argument.
-pub const DEFAULT_PARALLEL: usize = 4;
+///// The default value for [diff]'s `parallel` argument.
+//pub const DEFAULT_PARALLEL: usize = 4;
 
 fn make_file_sets<'a, K, F>(files: &HashSet<&'a files::File>, key: F)
     -> HashMap<K, HashSet<&'a files::File>>
@@ -42,30 +42,30 @@ fn make_file_sets<'a, K, F>(files: &HashSet<&'a files::File>, key: F)
 /// - `bits`: The bit distance in perceptual hashes to consider two images to be
 ///   similar. The amount of work grows exponentially with this value; `0` is a
 ///   good start. Default: [
-/// - `parallel`: The number of parallel executions to perform the work.
-pub fn diff(bits: Option<usize>, parallel: Option<usize>) -> ()
+///// - `parallel`: The number of parallel executions to perform the work.
+pub fn diff(bits: Option<usize>/*, parallel: Option<usize>*/) -> ()
 {
     let bits = bits.unwrap_or(DEFAULT_BITS) as u32;
-    let parallel = parallel.unwrap_or(DEFAULT_PARALLEL);
+    //let _parallel = parallel.unwrap_or(DEFAULT_PARALLEL);
 
     print!("Looking for files... ");
     io::stdout().flush().unwrap();
     let paths = files::list_files();
     println!("found {}", paths.len());
 
-    print!("Loading cache... ");
-    io::stdout().flush().unwrap();
-    let cache = match cache::load_cache() {
-        Ok(cache) => {
-            println!("{} entries loaded", cache.len());
-            cache
-        }
-        Err(e) => {
-            println!("Could not load cache: {}, continuing with empty cache",
-                e);
-            HashMap::new()
-        }
-    };
+    //print!("Loading cache... ");
+    //io::stdout().flush().unwrap();
+    //let _cache = match cache::load_cache() {
+    //    Ok(cache) => {
+    //        println!("{} entries loaded", cache.len());
+    //        cache
+    //    }
+    //    Err(e) => {
+    //        println!("Could not load cache: {}, continuing with empty cache",
+    //            e);
+    //        HashMap::new()
+    //    }
+    //};
 
     let config = simple_tqdm::Config::new()
         .with_desc("Processing files")
