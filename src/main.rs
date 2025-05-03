@@ -1,7 +1,7 @@
-pub mod cache;
 pub mod clusterer;
 pub mod diff;
 pub mod files;
+pub mod report;
 
 use clap::{Args, Parser, Subcommand};
 

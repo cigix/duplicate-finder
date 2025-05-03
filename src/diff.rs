@@ -1,6 +1,7 @@
 //use crate::cache;
 use crate::clusterer::Clusterer;
 use crate::files;
+use crate::report;
 
 use std::hash::Hash;
 use std::io;
@@ -167,6 +168,11 @@ pub fn diff(bits: Option<usize>/*, parallel: Option<usize>*/) -> ()
         })
         // Iter<Vec<&files::File>>
         .collect();
+    if let Err(e) = report::store_report(&identicals, &similars) {
+        println!("Could not store report: {}", e);
+    } else {
+        println!("Report written");
+    }
 
     println!();
     for identityset in identicals {
