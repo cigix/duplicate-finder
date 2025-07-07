@@ -48,6 +48,72 @@ pub fn send_to_trash(file: &PathBuf) -> bool
     return true;
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum Choice {
+    Yes,
+    No,
+    First,
+    Second,
+    KeepBoth,
+    FalsePositive,
+}
+
+impl Choice {
+    pub fn to_letter(&self) -> char
+    {
+        match self {
+            Self::Yes => 'y',
+            Self::No => 'n',
+            Self::First => '1',
+            Self::Second => '2',
+            Self::KeepBoth => 'k',
+            Self::FalsePositive => 'f',
+        }
+    }
+    pub fn from_letter(c: char, default: Choice) -> Self
+    {
+        match c.to_ascii_lowercase() {
+            'y' => Self::Yes,
+            'n' => Self::No,
+            '1' => Self::First,
+            '2' => Self::Second,
+            'k' => Self::KeepBoth,
+            'f' => Self::FalsePositive,
+            _ => default
+        }
+    }
+    pub fn each() -> [Self;6]
+    {
+        [Self::Yes, Self::No, Self::First, Self::Second, Self::KeepBoth, Self::FalsePositive]
+    }
+}
+
+fn make_choice(prompt: &str, default: Choice) -> Choice
+{
+    print!("{} [", prompt);
+    let mut first = true;
+    for choice in Choice::each() {
+        let mut c = choice.to_letter();
+        if default == choice {
+            c.make_ascii_uppercase()
+        }
+        if first {
+            first = false;
+        } else {
+            print!("/");
+        }
+        print!("{}", c);
+    }
+    print!("] ");
+    io::stdout().flush().unwrap();
+    let mut answer = String::new();
+    io::stdin().read_line(&mut answer).unwrap();
+    match answer.chars().next() {
+        Some(c) => Choice::from_letter(c, Choice::No),
+        None => default
+    }
+}
+
 pub fn interactive()
 {
     let mut report = match report::load_report() {
@@ -151,19 +217,20 @@ pub fn interactive()
             .spawn()
             .expect("Could not start `feh`");
         println!("These pictures are similar but of different size.");
-        print!("Delete the smaller one? [Y/n] ");
-        io::stdout().flush().unwrap();
-        let mut answer = String::new();
-        io::stdin().read_line(&mut answer).unwrap();
-        let _ = feh.kill();
-        answer.make_ascii_lowercase();
-        if answer == "\n" || answer == "y\n" {
-            if send_to_trash(&file1) {
-                handled.push(id);
-                continue
+        match make_choice("Delete the smaller one?", Choice::Yes) {
+            Choice::No => println!("Keeping them in the report."),
+            Choice::Yes | Choice::First => {
+                println!("Deleting {}", file1.display());
+                if send_to_trash(&file1) { handled.push(id); }
             }
+            Choice::Second => {
+                println!("Deleting {}", file2.display());
+                if send_to_trash(&file2) { handled.push(id); }
+            }
+            Choice::KeepBoth => todo!(),
+            Choice::FalsePositive => todo!(),
         }
-        println!("Keeping it in the report.");
+        let _ = feh.kill();
     }
 
     println!("====================");
@@ -179,19 +246,20 @@ pub fn interactive()
             .spawn()
             .expect("Could not start `feh`");
         println!("These pictures are similar and have the same size.");
-        print!("Delete the heavier one? [Y/n] ");
-        io::stdout().flush().unwrap();
-        let mut answer = String::new();
-        io::stdin().read_line(&mut answer).unwrap();
-        let _ = feh.kill();
-        answer.make_ascii_lowercase();
-        if answer == "\n" || answer == "y\n" {
-            if send_to_trash(&file2) {
-                handled.push(id);
-                continue
+        match make_choice("Delete the heavier one?", Choice::Yes) {
+            Choice::No => println!("Keeping them in the report."),
+            Choice::First => {
+                println!("Deleting {}", file1.display());
+                if send_to_trash(&file1) { handled.push(id); }
             }
+            Choice::Yes | Choice::Second => {
+                println!("Deleting {}", file2.display());
+                if send_to_trash(&file2) { handled.push(id); }
+            }
+            Choice::KeepBoth => todo!(),
+            Choice::FalsePositive => todo!(),
         }
-        println!("Keeping it in the report.");
+        let _ = feh.kill();
     }
 
     println!();
