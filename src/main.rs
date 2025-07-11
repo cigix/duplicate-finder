@@ -1,5 +1,6 @@
 pub mod clusterer;
 pub mod diff;
+pub mod false_positives;
 pub mod files;
 pub mod interactive;
 pub mod report;

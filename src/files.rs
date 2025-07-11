@@ -18,7 +18,7 @@ pub fn list_files() -> Vec<PathBuf>
         //.filter_entry(|entry| entry.file_type().is_file())
         //.map(|entry| entry.into_path())
         // Result<DirEntry, Error>
-        .filter_map(|result| 
+        .filter_map(|result|
             match result {
                 Ok(entry) => if entry.file_type().is_file() {
                     Some(entry.into_path())
@@ -48,9 +48,7 @@ fn get_image_hash(path: &PathBuf) -> Option<ImageHash>
 impl File {
     pub fn from(path: &PathBuf) -> Result<Self, String>
     {
-        let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
-        let mut hasher = Md5::new();
-        let _ = io::copy(&mut file, &mut hasher).map_err(|e| e.to_string())?;
+        let mut file = File::from_noihash(path)?;
         let extension: String = path.extension()
             // Option<&OsStr>
             .unwrap_or_default()
@@ -59,15 +57,21 @@ impl File {
             // Cow<&str>
             .into_owned();
 
-        let ihash = if IMAGE_EXTENSIONS.contains(&extension.as_str()) {
-            get_image_hash(path)
-        } else {
-            None
-        };
+        if IMAGE_EXTENSIONS.contains(&extension.as_str()) {
+            file.ihash = get_image_hash(path)
+        }
+        Ok(file)
+    }
+    pub fn from_noihash(path: &PathBuf) -> Result<Self, String>
+    {
+
+        let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
+        let mut hasher = Md5::new();
+        let _ = io::copy(&mut file, &mut hasher).map_err(|e| e.to_string())?;
         Ok(File {
             path: path.to_path_buf(),
             md5: hasher.finalize().into(),
-            ihash
+            ihash: None
         })
     }
 

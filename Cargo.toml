@@ -17,3 +17,4 @@ simple-tqdm = {version = "*", features = ["rayon"]}
 walkdir = "2.5.0"
 
 png = { version = "0.17.8-rc" }
+hex = "0.4.3"

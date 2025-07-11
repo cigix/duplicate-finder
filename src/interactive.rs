@@ -3,6 +3,8 @@
 /// Files are moved to a temporary trash directory as returned by
 /// [`std::env::tmp_dir()`].
 
+use crate::false_positives;
+use crate::files;
 use crate::report;
 
 use std::collections::{HashMap, HashSet};
@@ -109,6 +111,7 @@ fn make_choice(prompt: &str, default: Choice) -> Choice
     let mut answer = String::new();
     io::stdin().read_line(&mut answer).unwrap();
     match answer.chars().next() {
+        Some('\n') => default,
         Some(c) => Choice::from_letter(c, Choice::No),
         None => default
     }
@@ -121,6 +124,13 @@ pub fn interactive()
         Err(e) => {
             println!("Could not load report: {}", e);
             std::process::exit(1);
+        }
+    };
+    let mut fp = match false_positives::load() {
+        Ok(fp) => fp,
+        Err(e) => {
+            println!("Could not load false positives: {}", e);
+            false_positives::FalsePositives::default()
         }
     };
 
@@ -155,24 +165,45 @@ pub fn interactive()
         }
     }
 
-    let mut images: HashMap<usize, (PathBuf, PathBuf)> = HashMap::new();
+    let mut images: HashMap<usize, (files::File, files::File)> = HashMap::new();
     let mut samesize: HashSet<usize> = HashSet::new();
     let mut diffsize: HashSet<usize> = HashSet::new();
+    let mut others: HashSet<usize> = HashSet::new();
+    let mut handled: Vec<usize> = Vec::new();
+    let mut pairs_total = 0usize;
+    let mut fp_auto = 0usize;
     for (id, similarityset) in report.similars.iter().enumerate() {
         if similarityset.len() != 2 {
             continue;
         }
-        let file1 = PathBuf::from(similarityset.get(0).unwrap());
-        let file2 = PathBuf::from(similarityset.get(1).unwrap());
-        let image1 = image::open(&file1)
-            .expect(&format!("Could not open image {}", &file1.display()));
-        let image2 = image::open(&file2)
-            .expect(&format!("Could not open image {}", &file2.display()));
+        pairs_total += 1;
+        let path1 = PathBuf::from(similarityset.get(0).unwrap());
+        let path2 = PathBuf::from(similarityset.get(1).unwrap());
+        let image1 = image::open(&path1)
+            .expect(&format!("Could not open image {}", &path1.display()));
+        let image2 = image::open(&path2)
+            .expect(&format!("Could not open image {}", &path2.display()));
+
+        let file1 = files::File::from_noihash(&path1).unwrap();
+        let file2 = files::File::from_noihash(&path2).unwrap();
+
+        let pair1 = [file1.md5, file2.md5];
+        let pair2 = [file2.md5, file1.md5];
+        if fp.keep.contains(&pair1) || fp.keep.contains(&pair2) {
+            handled.push(id);
+            continue;
+        }
+        if fp.false_positives.contains(&pair1)
+            || fp.false_positives.contains(&pair2) {
+            handled.push(id);
+            fp_auto += 1;
+            continue
+        }
 
         if image1.width() == image2.width()
             && image1.height() == image2.height() {
-            let metadata1 = std::fs::metadata(&file1).unwrap();
-            let metadata2 = std::fs::metadata(&file2).unwrap();
+            let metadata1 = std::fs::metadata(&file1.path).unwrap();
+            let metadata2 = std::fs::metadata(&file2.path).unwrap();
             let size1 = metadata1.len();
             let size2 = metadata2.len();
             // The lighter image is first
@@ -198,37 +229,49 @@ pub fn interactive()
             diffsize.insert(id);
             continue;
         }
+
+        images.insert(id, (file2, file1));
+        others.insert(id);
     }
     // Remove mutability
     let images = images;
     let samesize = samesize;
     let diffsize = diffsize;
 
-    let mut handled: Vec<usize> = Vec::new();
+    let mut fp_added = 0usize;
 
     let diffsize_len = diffsize.len();
     for (progress, id) in diffsize.into_iter().enumerate() {
         let (file1, file2) = images.get(&id).unwrap();
         println!("\n{}/{}: {} vs {}", progress + 1, diffsize_len,
-            file1.display(), file2.display());
+            file1.path.display(), file2.path.display());
         let mut feh = Command::new("feh")
-            .args([file1, file2])
+            .args([&file1.path, &file2.path])
             .stdin(Stdio::null())
             .spawn()
             .expect("Could not start `feh`");
         println!("These pictures are similar but of different size.");
         match make_choice("Delete the smaller one?", Choice::Yes) {
-            Choice::No => println!("Keeping them in the report."),
+            Choice::No => println!("Keeping them in the report"),
             Choice::Yes | Choice::First => {
-                println!("Deleting {}", file1.display());
-                if send_to_trash(&file1) { handled.push(id); }
+                println!("Deleting {}", file1.path.display());
+                if send_to_trash(&file1.path) { handled.push(id); }
             }
             Choice::Second => {
-                println!("Deleting {}", file2.display());
-                if send_to_trash(&file2) { handled.push(id); }
+                println!("Deleting {}", file2.path.display());
+                if send_to_trash(&file2.path) { handled.push(id); }
             }
-            Choice::KeepBoth => todo!(),
-            Choice::FalsePositive => todo!(),
+            Choice::KeepBoth => {
+                println!("Keeping both");
+                fp.keep.insert([file1.md5, file2.md5]);
+                handled.push(id);
+            }
+            Choice::FalsePositive => {
+                println!("False positive");
+                fp.false_positives.insert([file1.md5, file2.md5]);
+                handled.push(id);
+                fp_added += 1;
+            }
         }
         let _ = feh.kill();
     }
@@ -239,9 +282,9 @@ pub fn interactive()
     for (progress, id) in samesize.into_iter().enumerate() {
         let (file1, file2) = images.get(&id).unwrap();
         println!("\n{}/{}: {} vs {}", progress + 1, samesize_len,
-            file1.display(), file2.display());
+            file1.path.display(), file2.path.display());
         let mut feh = Command::new("feh")
-            .args([file1, file2])
+            .args([&file1.path, &file2.path])
             .stdin(Stdio::null())
             .spawn()
             .expect("Could not start `feh`");
@@ -249,15 +292,62 @@ pub fn interactive()
         match make_choice("Delete the heavier one?", Choice::Yes) {
             Choice::No => println!("Keeping them in the report."),
             Choice::First => {
-                println!("Deleting {}", file1.display());
-                if send_to_trash(&file1) { handled.push(id); }
+                println!("Deleting {}", file1.path.display());
+                if send_to_trash(&file1.path) { handled.push(id); }
             }
             Choice::Yes | Choice::Second => {
-                println!("Deleting {}", file2.display());
-                if send_to_trash(&file2) { handled.push(id); }
+                println!("Deleting {}", file2.path.display());
+                if send_to_trash(&file2.path) { handled.push(id); }
             }
-            Choice::KeepBoth => todo!(),
-            Choice::FalsePositive => todo!(),
+            Choice::KeepBoth => {
+                println!("Keeping both");
+                fp.keep.insert([file1.md5, file2.md5]);
+                handled.push(id);
+            }
+            Choice::FalsePositive => {
+                println!("False positive");
+                fp.false_positives.insert([file1.md5, file2.md5]);
+                handled.push(id);
+                fp_added += 1;
+            }
+        }
+        let _ = feh.kill();
+    }
+
+    println!("====================");
+
+    let others_len = others.len();
+    for (progress, id) in others.into_iter().enumerate() {
+        let (file1, file2) = images.get(&id).unwrap();
+        println!("\n{}/{}: {} vs {}", progress + 1, others_len,
+            file1.path.display(), file2.path.display());
+        let mut feh = Command::new("feh")
+            .args([&file1.path, &file2.path])
+            .stdin(Stdio::null())
+            .spawn()
+            .expect("Could not start `feh`");
+        println!("These pictures are roughly similar.");
+        match make_choice("Keep both?", Choice::Yes) {
+            Choice::No => println!("Keeping them in the report."),
+            Choice::First => {
+                println!("Deleting {}", file1.path.display());
+                if send_to_trash(&file1.path) { handled.push(id); }
+            }
+            Choice::Second => {
+                println!("Deleting {}", file2.path.display());
+                if send_to_trash(&file2.path) { handled.push(id); }
+            }
+            Choice::Yes | Choice::KeepBoth => {
+                println!("Keeping both");
+                fp.keep.insert([file1.md5, file2.md5]);
+                handled.push(id);
+            }
+            Choice::FalsePositive => {
+                println!("False positive");
+                fp.false_positives.insert([file1.md5, file2.md5]);
+                handled.push(id);
+                fp_added += 1;
+            }
         }
         let _ = feh.kill();
     }
@@ -274,6 +364,11 @@ pub fn interactive()
     } else {
         println!("Report written");
     }
+    if let Err(e) = false_positives::store(&fp) {
+        println!("Could not store false positives: {}", e);
+    } else {
+        println!("False positive reviews written");
+    }
 
     if !report.similars.is_empty() {
         println!();
@@ -285,5 +380,12 @@ pub fn interactive()
             }
             println!();
         }
+    }
+
+    if 0 < pairs_total {
+        let fp_total = fp_auto + fp_added;
+        println!();
+        println!("False positives rate: {}% ({}/{})",
+                 100 * fp_total / pairs_total, fp_total, pairs_total);
     }
 }
