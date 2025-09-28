@@ -1,5 +1,6 @@
 //use crate::cache;
 use crate::clusterer::Clusterer;
+use crate::ffmpeg_callback;
 use crate::files;
 use crate::report;
 
@@ -48,6 +49,9 @@ pub fn diff(bits: Option<usize>/*, parallel: Option<usize>*/) -> ()
 {
     let bits = bits.unwrap_or(DEFAULT_BITS) as u32;
     //let _parallel = parallel.unwrap_or(DEFAULT_PARALLEL);
+
+    ffmpeg_next::init().unwrap();
+    ffmpeg_callback::set_logging_callback();
 
     print!("Looking for files... ");
     io::stdout().flush().unwrap();

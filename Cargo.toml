@@ -18,3 +18,7 @@ walkdir = "2.5.0"
 
 png = { version = "0.17.8-rc" }
 hex = "0.4.3"
+ffmpeg-next = "8.0.0"
+log = "0.4.28"
+libc = "0.2.176"
+vsprintf = "2.0.0"

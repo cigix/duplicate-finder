@@ -176,9 +176,32 @@ pub fn interactive()
         if similarityset.len() != 2 {
             continue;
         }
-        pairs_total += 1;
+
         let path1 = PathBuf::from(similarityset.get(0).unwrap());
         let path2 = PathBuf::from(similarityset.get(1).unwrap());
+
+        let extension1 = path1.extension()
+            // Option<&OsStr>
+            .unwrap_or_default()
+            // &OsStr
+            .to_string_lossy()
+            // Cow<&str>
+            .into_owned();
+        if files::VIDEO_EXTENSIONS.contains(&extension1.as_str()) {
+            continue;
+        }
+        let extension2 = path2.extension()
+            // Option<&OsStr>
+            .unwrap_or_default()
+            // &OsStr
+            .to_string_lossy()
+            // Cow<&str>
+            .into_owned();
+        if files::VIDEO_EXTENSIONS.contains(&extension2.as_str()) {
+            continue;
+        }
+
+        pairs_total += 1;
         let image1 = image::open(&path1)
             .expect(&format!("Could not open image {}", &path1.display()));
         let image2 = image::open(&path2)
@@ -276,7 +299,7 @@ pub fn interactive()
         let _ = feh.kill();
     }
 
-    println!("====================");
+    println!("\n====================");
 
     let samesize_len = samesize.len();
     for (progress, id) in samesize.into_iter().enumerate() {
@@ -314,7 +337,7 @@ pub fn interactive()
         let _ = feh.kill();
     }
 
-    println!("====================");
+    println!("\n====================");
 
     let others_len = others.len();
     for (progress, id) in others.into_iter().enumerate() {

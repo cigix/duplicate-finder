@@ -4,6 +4,7 @@ pub mod false_positives;
 pub mod files;
 pub mod interactive;
 pub mod report;
+pub mod ffmpeg_callback;
 
 use clap::{Args, Parser, Subcommand};
 
