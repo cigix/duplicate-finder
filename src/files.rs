@@ -10,9 +10,10 @@ use walkdir::WalkDir;
 
 /// Files who are considered images based on their extensions.
 pub const IMAGE_EXTENSIONS: [&str;3] = ["jpg", "png", "webp"];
-
+/// Files who are considered animations based on their extensions.
+pub const ANIM_EXTENSIONS: [&str;2] = ["gif", "awebp"];
 /// Files who are considered videos based on their extensions.
-pub const VIDEO_EXTENSIONS: [&str;2] = ["mp4", "gif"];
+pub const VIDEO_EXTENSIONS: [&str;2] = ["mp4", "webm"];
 
 pub fn list_files() -> Vec<PathBuf>
 {
@@ -129,7 +130,8 @@ impl File {
                 }
             }
         }
-        if VIDEO_EXTENSIONS.contains(&extension.as_str()) {
+        if VIDEO_EXTENSIONS.contains(&extension.as_str()) ||
+            ANIM_EXTENSIONS.contains(&extension.as_str()) {
             file.ihash = match get_video_hash(path) {
                 Ok(h) => Some(h),
                 Err(e) => {

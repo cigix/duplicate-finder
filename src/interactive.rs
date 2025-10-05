@@ -165,14 +165,30 @@ pub fn interactive()
         }
     }
 
-    let mut images: HashMap<usize, (files::File, files::File)> = HashMap::new();
-    let mut samesize: HashSet<usize> = HashSet::new();
-    let mut diffsize: HashSet<usize> = HashSet::new();
-    let mut others: HashSet<usize> = HashSet::new();
+    // The pairs of files that reprensent similar animations, images, and
+    // videos, by id of appearance in the report.
+    let mut pairs: HashMap<usize, (files::File, files::File)> = HashMap::new();
+
+    // The ids of similar animations.
+    let mut similar_anims: HashSet<usize> = HashSet::new();
+    // The ids of similar videos.
+    let mut similar_videos: HashSet<usize> = HashSet::new();
+    // The ids of similar images that have one clearly larger than the other.
+    let mut diffdims: HashSet<usize> = HashSet::new();
+    // The ids of similar images that have the same dimensions.
+    let mut samedims: HashSet<usize> = HashSet::new();
+    // The ids of similar images that do not fit the two previous categories.
+    let mut other_images: HashSet<usize> = HashSet::new();
+
+    // The ids of pairs that have been handled and can be taken out of the
+    // report.
     let mut handled: Vec<usize> = Vec::new();
-    let mut pairs_total = 0usize;
+    // The number of false positives that have been handled automatically from
+    // the false_positives report.
     let mut fp_auto = 0usize;
+
     for (id, similarityset) in report.similars.iter().enumerate() {
+        // We only consider pairs here
         if similarityset.len() != 2 {
             continue;
         }
@@ -187,9 +203,6 @@ pub fn interactive()
             .to_string_lossy()
             // Cow<&str>
             .into_owned();
-        if files::VIDEO_EXTENSIONS.contains(&extension1.as_str()) {
-            continue;
-        }
         let extension2 = path2.extension()
             // Option<&OsStr>
             .unwrap_or_default()
@@ -197,15 +210,6 @@ pub fn interactive()
             .to_string_lossy()
             // Cow<&str>
             .into_owned();
-        if files::VIDEO_EXTENSIONS.contains(&extension2.as_str()) {
-            continue;
-        }
-
-        pairs_total += 1;
-        let image1 = image::open(&path1)
-            .expect(&format!("Could not open image {}", &path1.display()));
-        let image2 = image::open(&path2)
-            .expect(&format!("Could not open image {}", &path2.display()));
 
         let file1 = files::File::from_noihash(&path1).unwrap();
         let file2 = files::File::from_noihash(&path2).unwrap();
@@ -223,57 +227,82 @@ pub fn interactive()
             continue
         }
 
-        if image1.width() == image2.width()
-            && image1.height() == image2.height() {
-            let metadata1 = std::fs::metadata(&file1.path).unwrap();
-            let metadata2 = std::fs::metadata(&file2.path).unwrap();
-            let size1 = metadata1.len();
-            let size2 = metadata2.len();
-            // The lighter image is first
-            if size1 < size2 {
-                images.insert(id, (file1, file2));
-            } else {
-                images.insert(id, (file2, file1));
-            }
-            samesize.insert(id);
-            continue;
-        }
-        if image1.width() < image2.width()
-            && image1.height() < image2.height() {
-            // The smaller image is first
-            images.insert(id, (file1, file2));
-            diffsize.insert(id);
-            continue;
-        }
-        if image2.width() < image1.width()
-            && image2.height() < image1.height() {
-            // The smaller image is first
-            images.insert(id, (file2, file1));
-            diffsize.insert(id);
-            continue;
-        }
+        if files::ANIM_EXTENSIONS.contains(&extension1.as_str())
+            && files::ANIM_EXTENSIONS.contains(&extension2.as_str()) {
+            // both are animations
+            pairs.insert(id, (file1, file2));
+            similar_anims.insert(id);
+        } else if files::VIDEO_EXTENSIONS.contains(&extension1.as_str())
+            && files::VIDEO_EXTENSIONS.contains(&extension2.as_str()) {
+            // both are videos
+            pairs.insert(id, (file1, file2));
+            similar_videos.insert(id);
+        } else if files::IMAGE_EXTENSIONS.contains(&extension1.as_str())
+            && files::IMAGE_EXTENSIONS.contains(&extension2.as_str()) {
+            // both are images
+            // We do not insert into pairs yet: we need to be able to borrow,
+            // and alter the order of the pair.
 
-        images.insert(id, (file2, file1));
-        others.insert(id);
+            let image1 = image::open(&path1)
+                .expect(&format!("Could not open image {}", &path1.display()));
+            let image2 = image::open(&path2)
+                .expect(&format!("Could not open image {}", &path2.display()));
+
+            if image1.width() == image2.width()
+                && image1.height() == image2.height() {
+                let metadata1 = std::fs::metadata(&file1.path).unwrap();
+                let metadata2 = std::fs::metadata(&file2.path).unwrap();
+                let size1 = metadata1.len();
+                let size2 = metadata2.len();
+                // The lighter image is first
+                if size1 < size2 {
+                    pairs.insert(id, (file1, file2));
+                } else {
+                    pairs.insert(id, (file2, file1));
+                }
+                samedims.insert(id);
+                continue;
+            }
+            if image1.width() < image2.width()
+                && image1.height() < image2.height() {
+                // The smaller image is first
+                pairs.insert(id, (file1, file2));
+                diffdims.insert(id);
+                continue;
+            }
+            if image2.width() < image1.width()
+                && image2.height() < image1.height() {
+                // The smaller image is first
+                pairs.insert(id, (file2, file1));
+                diffdims.insert(id);
+                continue;
+            }
+
+            pairs.insert(id, (file1, file2));
+            other_images.insert(id);
+        }
     }
     // Remove mutability
-    let images = images;
-    let samesize = samesize;
-    let diffsize = diffsize;
+    let pairs = pairs;
+    let similar_anims = similar_anims;
+    let similar_videos = similar_videos;
+    let diffdims = diffdims;
+    let samedims = samedims;
+    let other_images = other_images;
 
     let mut fp_added = 0usize;
 
-    let diffsize_len = diffsize.len();
-    for (progress, id) in diffsize.into_iter().enumerate() {
-        let (file1, file2) = images.get(&id).unwrap();
-        println!("\n{}/{}: {} vs {}", progress + 1, diffsize_len,
+    let diffdims_len = diffdims.len();
+    for (progress, id) in diffdims.into_iter().enumerate() {
+        let (file1, file2) = pairs.get(&id).unwrap();
+        println!("\n{}/{}: {} vs {}", progress + 1, diffdims_len,
             file1.path.display(), file2.path.display());
-        let mut feh = Command::new("feh")
+        let mut viewer = Command::new("feh")
             .args([&file1.path, &file2.path])
             .stdin(Stdio::null())
             .spawn()
             .expect("Could not start `feh`");
-        println!("These pictures are similar but of different size.");
+        println!("These pictures are similar but of different dimensions.");
         match make_choice("Delete the smaller one?", Choice::Yes) {
             Choice::No => println!("Keeping them in the report"),
             Choice::Yes | Choice::First => {
@@ -296,22 +325,22 @@ pub fn interactive()
                 fp_added += 1;
             }
         }
-        let _ = feh.kill();
+        let _ = viewer.kill();
     }
 
     println!("\n====================");
 
-    let samesize_len = samesize.len();
-    for (progress, id) in samesize.into_iter().enumerate() {
-        let (file1, file2) = images.get(&id).unwrap();
+    let samesize_len = samedims.len();
+    for (progress, id) in samedims.into_iter().enumerate() {
+        let (file1, file2) = pairs.get(&id).unwrap();
         println!("\n{}/{}: {} vs {}", progress + 1, samesize_len,
             file1.path.display(), file2.path.display());
-        let mut feh = Command::new("feh")
+        let mut viewer = Command::new("feh")
             .args([&file1.path, &file2.path])
             .stdin(Stdio::null())
             .spawn()
             .expect("Could not start `feh`");
-        println!("These pictures are similar and have the same size.");
+        println!("These pictures are similar and have the same dimensions.");
         match make_choice("Delete the heavier one?", Choice::Yes) {
             Choice::No => println!("Keeping them in the report."),
             Choice::First => {
@@ -334,17 +363,17 @@ pub fn interactive()
                 fp_added += 1;
             }
         }
-        let _ = feh.kill();
+        let _ = viewer.kill();
     }
 
     println!("\n====================");
 
-    let others_len = others.len();
-    for (progress, id) in others.into_iter().enumerate() {
-        let (file1, file2) = images.get(&id).unwrap();
+    let others_len = other_images.len();
+    for (progress, id) in other_images.into_iter().enumerate() {
+        let (file1, file2) = pairs.get(&id).unwrap();
         println!("\n{}/{}: {} vs {}", progress + 1, others_len,
             file1.path.display(), file2.path.display());
-        let mut feh = Command::new("feh")
+        let mut viewer = Command::new("feh")
             .args([&file1.path, &file2.path])
             .stdin(Stdio::null())
             .spawn()
@@ -372,7 +401,85 @@ pub fn interactive()
                 fp_added += 1;
             }
         }
-        let _ = feh.kill();
+        let _ = viewer.kill();
+    }
+
+    println!("\n====================");
+
+    let anims_len = similar_anims.len();
+    for (progress, id) in similar_anims.into_iter().enumerate() {
+        let (file1, file2) = pairs.get(&id).unwrap();
+        println!("\n{}/{}: {} vs {}", progress + 1, anims_len,
+            file1.path.display(), file2.path.display());
+        let mut viewer = Command::new("gwenview")
+            .args([&file1.path, &file2.path])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("Could not start `gwenview`");
+        println!("These animations start similarly.");
+        match make_choice("Keep both?", Choice::Yes) {
+            Choice::No => println!("Keeping them in the report."),
+            Choice::First => {
+                println!("Deleting {}", file1.path.display());
+                if send_to_trash(&file1.path) { handled.push(id); }
+            }
+            Choice::Second => {
+                println!("Deleting {}", file2.path.display());
+                if send_to_trash(&file2.path) { handled.push(id); }
+            }
+            Choice::Yes | Choice::KeepBoth => {
+                println!("Keeping both");
+                fp.keep.insert([file1.md5, file2.md5]);
+                handled.push(id);
+            }
+            Choice::FalsePositive => {
+                println!("False positive");
+                fp.false_positives.insert([file1.md5, file2.md5]);
+                handled.push(id);
+                fp_added += 1;
+            }
+        }
+        let _ = viewer.kill();
+    }
+
+    println!("\n====================");
+
+    let videos_len = similar_videos.len();
+    for (progress, id) in similar_videos.into_iter().enumerate() {
+        let (file1, file2) = pairs.get(&id).unwrap();
+        println!("\n{}/{}: {} vs {}", progress + 1, videos_len,
+            file1.path.display(), file2.path.display());
+        let mut viewer = Command::new("vlc")
+            .args([&file1.path, &file2.path])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("Could not start `vlc`");
+        println!("These videos start similarly.");
+        match make_choice("Keep both?", Choice::Yes) {
+            Choice::No => println!("Keeping them in the report."),
+            Choice::First => {
+                println!("Deleting {}", file1.path.display());
+                if send_to_trash(&file1.path) { handled.push(id); }
+            }
+            Choice::Second => {
+                println!("Deleting {}", file2.path.display());
+                if send_to_trash(&file2.path) { handled.push(id); }
+            }
+            Choice::Yes | Choice::KeepBoth => {
+                println!("Keeping both");
+                fp.keep.insert([file1.md5, file2.md5]);
+                handled.push(id);
+            }
+            Choice::FalsePositive => {
+                println!("False positive");
+                fp.false_positives.insert([file1.md5, file2.md5]);
+                handled.push(id);
+                fp_added += 1;
+            }
+        }
+        let _ = viewer.kill();
     }
 
     println!();
@@ -405,10 +512,10 @@ pub fn interactive()
         }
     }
 
-    if 0 < pairs_total {
+    if 0 < pairs.len() {
         let fp_total = fp_auto + fp_added;
         println!();
         println!("False positives rate: {}% ({}/{})",
-                 100 * fp_total / pairs_total, fp_total, pairs_total);
+                 100 * fp_total / pairs.len(), fp_total, pairs.len());
     }
 }
