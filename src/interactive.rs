@@ -58,6 +58,7 @@ enum Choice {
     Second,
     KeepBoth,
     FalsePositive,
+    Heaviest,
 }
 
 impl Choice {
@@ -70,6 +71,7 @@ impl Choice {
             Self::Second => '2',
             Self::KeepBoth => 'k',
             Self::FalsePositive => 'f',
+            Self::Heaviest => 'h',
         }
     }
     pub fn from_letter(c: char, default: Choice) -> Self
@@ -81,12 +83,13 @@ impl Choice {
             '2' => Self::Second,
             'k' => Self::KeepBoth,
             'f' => Self::FalsePositive,
+            'h' => Self::Heaviest,
             _ => default
         }
     }
-    pub fn each() -> [Self;6]
+    pub fn each() -> [Self;7]
     {
-        [Self::Yes, Self::No, Self::First, Self::Second, Self::KeepBoth, Self::FalsePositive]
+        [Self::Yes, Self::No, Self::First, Self::Second, Self::KeepBoth, Self::FalsePositive, Self::Heaviest]
     }
 }
 
@@ -324,6 +327,19 @@ pub fn interactive()
                 handled.push(id);
                 fp_added += 1;
             }
+            Choice::Heaviest => {
+                let metadata1 = std::fs::metadata(&file1.path).unwrap();
+                let metadata2 = std::fs::metadata(&file2.path).unwrap();
+                let size1 = metadata1.len();
+                let size2 = metadata2.len();
+                if size1 < size2 {
+                    println!("Deleting {}", file2.path.display());
+                    if send_to_trash(&file2.path) { handled.push(id); }
+                } else {
+                    println!("Deleting {}", file1.path.display());
+                    if send_to_trash(&file1.path) { handled.push(id); }
+                }
+            }
         }
         let _ = viewer.kill();
     }
@@ -347,7 +363,7 @@ pub fn interactive()
                 println!("Deleting {}", file1.path.display());
                 if send_to_trash(&file1.path) { handled.push(id); }
             }
-            Choice::Yes | Choice::Second => {
+            Choice::Yes | Choice::Second | Choice::Heaviest => {
                 println!("Deleting {}", file2.path.display());
                 if send_to_trash(&file2.path) { handled.push(id); }
             }
@@ -400,6 +416,19 @@ pub fn interactive()
                 handled.push(id);
                 fp_added += 1;
             }
+            Choice::Heaviest => {
+                let metadata1 = std::fs::metadata(&file1.path).unwrap();
+                let metadata2 = std::fs::metadata(&file2.path).unwrap();
+                let size1 = metadata1.len();
+                let size2 = metadata2.len();
+                if size1 < size2 {
+                    println!("Deleting {}", file2.path.display());
+                    if send_to_trash(&file2.path) { handled.push(id); }
+                } else {
+                    println!("Deleting {}", file1.path.display());
+                    if send_to_trash(&file1.path) { handled.push(id); }
+                }
+            }
         }
         let _ = viewer.kill();
     }
@@ -439,6 +468,19 @@ pub fn interactive()
                 handled.push(id);
                 fp_added += 1;
             }
+            Choice::Heaviest => {
+                let metadata1 = std::fs::metadata(&file1.path).unwrap();
+                let metadata2 = std::fs::metadata(&file2.path).unwrap();
+                let size1 = metadata1.len();
+                let size2 = metadata2.len();
+                if size1 < size2 {
+                    println!("Deleting {}", file2.path.display());
+                    if send_to_trash(&file2.path) { handled.push(id); }
+                } else {
+                    println!("Deleting {}", file1.path.display());
+                    if send_to_trash(&file1.path) { handled.push(id); }
+                }
+            }
         }
         let _ = viewer.kill();
     }
@@ -477,6 +519,19 @@ pub fn interactive()
                 fp.false_positives.insert([file1.md5, file2.md5]);
                 handled.push(id);
                 fp_added += 1;
+            }
+            Choice::Heaviest => {
+                let metadata1 = std::fs::metadata(&file1.path).unwrap();
+                let metadata2 = std::fs::metadata(&file2.path).unwrap();
+                let size1 = metadata1.len();
+                let size2 = metadata2.len();
+                if size1 < size2 {
+                    println!("Deleting {}", file2.path.display());
+                    if send_to_trash(&file2.path) { handled.push(id); }
+                } else {
+                    println!("Deleting {}", file1.path.display());
+                    if send_to_trash(&file1.path) { handled.push(id); }
+                }
             }
         }
         let _ = viewer.kill();
