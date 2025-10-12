@@ -8,12 +8,70 @@ use image_hasher::{HasherConfig, ImageHash};
 use md5::{Digest, Md5};
 use walkdir::WalkDir;
 
-/// Files who are considered images based on their extensions.
-pub const IMAGE_EXTENSIONS: [&str;3] = ["jpg", "png", "webp"];
-/// Files who are considered animations based on their extensions.
-pub const ANIM_EXTENSIONS: [&str;2] = ["gif", "awebp"];
+/// The category of file in regards to comparison.
+#[derive(PartialEq,Eq)]
+pub enum Category {
+    UNKNOWN,
+    IMAGE,
+    ANIMATION,
+    VIDEO,
+}
+
+/// Files who are considered images based on their extensions. WepB is handled
+/// separately, see [get_category()].
+const IMAGE_EXTENSIONS: [&str;2] = ["jpg", "png"];
+/// Files who are considered animations based on their extensions. WebP is
+/// handled separately, see [get_category()].
+const ANIM_EXTENSIONS: [&str;1] = ["gif"];
 /// Files who are considered videos based on their extensions.
-pub const VIDEO_EXTENSIONS: [&str;2] = ["mp4", "webm"];
+const VIDEO_EXTENSIONS: [&str;2] = ["mp4", "webm"];
+/// Files who are of the WebP format, which can hold both images and animations.
+const WEBP_EXTENSIONS: [&str;1] = ["webp"];
+
+/// Get the category of the file based on its extension:
+/// - [Category::IMAGE] for extensions in [IMAGE_EXTENSIONS],
+/// - [Category::ANIMATION] for extensions in [ANIM_EXTENSIONS],
+/// - [Category::VIDEO] for extensions in [VIDEO_EXTENSIONS],
+/// - [Category::UNKNOWN] otherwise.
+///
+/// Files matching [WEBP_EXTENSIONS] are opened to determine if they are
+/// [Category::IMAGE] or [Category::ANIMATION].
+///
+/// # Errors
+///
+/// This function errors if a WebP file cannot be opened or decoded.
+pub fn get_category(path: &PathBuf) -> Result<Category, String>
+{
+    let extension: String = path.extension()
+        // Option<&OsStr>
+        .unwrap_or_default()
+        // &OsStr
+        .to_string_lossy()
+        // Cow<&str>
+        .into_owned();
+
+    if WEBP_EXTENSIONS.contains(&extension.as_str()) {
+        let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+        let reader = std::io::BufReader::new(file);
+        let decoder = image::codecs::webp::WebPDecoder::new(reader)
+            .map_err(|e| e.to_string())?;
+        return Ok(if decoder.has_animation() {
+            Category::ANIMATION
+        } else {
+            Category::IMAGE
+        });
+    }
+    if IMAGE_EXTENSIONS.contains(&extension.as_str()) {
+        return Ok(Category::IMAGE);
+    }
+    if ANIM_EXTENSIONS.contains(&extension.as_str()) {
+        return Ok(Category::ANIMATION);
+    }
+    if VIDEO_EXTENSIONS.contains(&extension.as_str()) {
+        return Ok(Category::VIDEO);
+    }
+    Ok(Category::UNKNOWN)
+}
 
 pub fn list_files() -> Vec<PathBuf>
 {
@@ -37,6 +95,7 @@ pub fn list_files() -> Vec<PathBuf>
 
 pub struct File {
     pub path: PathBuf,
+    pub category: Category,
     pub md5: [u8;16],
     pub ihash: Option<ImageHash>
 }
@@ -49,7 +108,7 @@ fn get_image_hash(path: &PathBuf) -> Result<ImageHash, String>
     Ok(hash)
 }
 
-fn get_video_hash(path: &PathBuf) -> Result<ImageHash, String>
+fn get_video_or_anim_hash(path: &PathBuf) -> Result<ImageHash, String>
 {
     // Adapted from https://github.com/zmwangx/rust-ffmpeg/blob/master/examples/dump-frames.rs
     let mut ictx = ffmpeg_next::format::input(&path)
@@ -113,33 +172,27 @@ impl File {
     pub fn from(path: &PathBuf) -> Result<Self, String>
     {
         let mut file = File::from_noihash(path)?;
-        let extension: String = path.extension()
-            // Option<&OsStr>
-            .unwrap_or_default()
-            // &OsStr
-            .to_string_lossy()
-            // Cow<&str>
-            .into_owned();
 
-        if IMAGE_EXTENSIONS.contains(&extension.as_str()) {
-            file.ihash = match get_image_hash(path) {
-                Ok(h) => Some(h),
-                Err(e) => {
-                    eprintln!("{}: {}", path.display(), e);
-                    None
+        file.ihash = match file.category {
+            Category::IMAGE =>
+                match get_image_hash(path) {
+                    Ok(h) => Some(h),
+                    Err(e) => {
+                        eprintln!("{}: {}", path.display(), e);
+                        None
+                    }
                 }
-            }
-        }
-        if VIDEO_EXTENSIONS.contains(&extension.as_str()) ||
-            ANIM_EXTENSIONS.contains(&extension.as_str()) {
-            file.ihash = match get_video_hash(path) {
-                Ok(h) => Some(h),
-                Err(e) => {
-                    eprintln!("{}: {}", path.display(), e);
-                    None
+            Category::ANIMATION | Category::VIDEO =>
+                match get_video_or_anim_hash(path) {
+                    Ok(h) => Some(h),
+                    Err(e) => {
+                        eprintln!("{}: {}", path.display(), e);
+                        None
+                    }
                 }
-            }
-        }
+            Category::UNKNOWN => None
+        };
+
         Ok(file)
     }
     pub fn from_noihash(path: &PathBuf) -> Result<Self, String>
@@ -151,6 +204,7 @@ impl File {
             .map_err(|s| format!("{}: {}", path.display(), s))?;
         Ok(File {
             path: path.to_path_buf(),
+            category: get_category(&path)?,
             md5: hasher.finalize().into(),
             ihash: None
         })

@@ -199,21 +199,6 @@ pub fn interactive()
         let path1 = PathBuf::from(similarityset.get(0).unwrap());
         let path2 = PathBuf::from(similarityset.get(1).unwrap());
 
-        let extension1 = path1.extension()
-            // Option<&OsStr>
-            .unwrap_or_default()
-            // &OsStr
-            .to_string_lossy()
-            // Cow<&str>
-            .into_owned();
-        let extension2 = path2.extension()
-            // Option<&OsStr>
-            .unwrap_or_default()
-            // &OsStr
-            .to_string_lossy()
-            // Cow<&str>
-            .into_owned();
-
         let file1 = files::File::from_noihash(&path1).unwrap();
         let file2 = files::File::from_noihash(&path2).unwrap();
 
@@ -230,18 +215,18 @@ pub fn interactive()
             continue
         }
 
-        if files::ANIM_EXTENSIONS.contains(&extension1.as_str())
-            && files::ANIM_EXTENSIONS.contains(&extension2.as_str()) {
+        if file1.category == files::Category::ANIMATION
+            && file2.category == files::Category::ANIMATION {
             // both are animations
             pairs.insert(id, (file1, file2));
             similar_anims.insert(id);
-        } else if files::VIDEO_EXTENSIONS.contains(&extension1.as_str())
-            && files::VIDEO_EXTENSIONS.contains(&extension2.as_str()) {
+        } else if file1.category == files::Category::VIDEO
+            && file2.category == files::Category::VIDEO {
             // both are videos
             pairs.insert(id, (file1, file2));
             similar_videos.insert(id);
-        } else if files::IMAGE_EXTENSIONS.contains(&extension1.as_str())
-            && files::IMAGE_EXTENSIONS.contains(&extension2.as_str()) {
+        } else if file1.category == files::Category::IMAGE
+            && file2.category == files::Category::IMAGE {
             // both are images
             // We do not insert into pairs yet: we need to be able to borrow,
             // and alter the order of the pair.
