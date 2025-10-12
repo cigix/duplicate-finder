@@ -4,6 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::PathBuf;
 
+use image::AnimationDecoder;
 use image_hasher::{HasherConfig, ImageHash};
 use md5::{Digest, Md5};
 use walkdir::WalkDir;
@@ -108,7 +109,48 @@ fn get_image_hash(path: &PathBuf) -> Result<ImageHash, String>
     Ok(hash)
 }
 
-fn get_video_or_anim_hash(path: &PathBuf) -> Result<ImageHash, String>
+fn get_anim_hash(path: &PathBuf) -> Result<ImageHash, String>
+{
+    let extension: String = path.extension()
+        // Option<&OsStr>
+        .unwrap_or_default()
+        // &OsStr
+        .to_string_lossy()
+        // Cow<&str>
+        .into_owned();
+
+    let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let reader = std::io::BufReader::new(file);
+
+    let first_frame : image::Frame =
+        if WEBP_EXTENSIONS.contains(&extension.as_str()) {
+            image::codecs::webp::WebPDecoder::new(reader)
+                // Result<WebPDecoder, ImageError>
+                .map_err(|e| e.to_string())?
+                // WebPDecoder
+                .into_frames()
+                // Frames
+                .next()
+                // Option<Result<Frame, ImageError>>
+                .ok_or("No first frame")?
+                // Result<Frame, ImageError>
+                .map_err(|e| e.to_string())?
+        } else {
+            // Ditto but with GifDecoder
+            image::codecs::gif::GifDecoder::new(reader)
+                .map_err(|e| e.to_string())?
+                .into_frames()
+                .next()
+                .ok_or("No first frame")?
+                .map_err(|e| e.to_string())?
+        };
+
+    let hasher = HasherConfig::new().to_hasher();
+    let hash = hasher.hash_image(first_frame.buffer());
+    Ok(hash)
+}
+
+fn get_video_hash(path: &PathBuf) -> Result<ImageHash, String>
 {
     // Adapted from https://github.com/zmwangx/rust-ffmpeg/blob/master/examples/dump-frames.rs
     let mut ictx = ffmpeg_next::format::input(&path)
@@ -174,24 +216,18 @@ impl File {
         let mut file = File::from_noihash(path)?;
 
         file.ihash = match file.category {
-            Category::IMAGE =>
-                match get_image_hash(path) {
-                    Ok(h) => Some(h),
-                    Err(e) => {
-                        eprintln!("{}: {}", path.display(), e);
-                        None
-                    }
-                }
-            Category::ANIMATION | Category::VIDEO =>
-                match get_video_or_anim_hash(path) {
-                    Ok(h) => Some(h),
-                    Err(e) => {
-                        eprintln!("{}: {}", path.display(), e);
-                        None
-                    }
-                }
-            Category::UNKNOWN => None
-        };
+                Category::IMAGE => Some(get_image_hash(path)),
+                Category::ANIMATION => Some(get_anim_hash(path)),
+                Category::VIDEO => Some(get_video_hash(path)),
+                Category::UNKNOWN => None
+            }
+            // Option<Result<ImageHash, String>>
+            .transpose()
+            // Result<Option<ImageHash>, String>
+            .unwrap_or_else(|e| {
+                eprintln!("{}: {}", path.display(), e);
+                None
+            });
 
         Ok(file)
     }
